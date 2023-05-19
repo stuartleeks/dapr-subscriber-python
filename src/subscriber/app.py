@@ -38,3 +38,4 @@ async def new_notification(notification: CloudEvent):
     message_id = notification.data["id"]
     print(f"new notification: id={message_id}")
     print(f"message: {notification.data['message']}")
+    # return {"status": "RETRY"}
