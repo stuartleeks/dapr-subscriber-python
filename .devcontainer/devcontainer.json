@@ -1,0 +1,42 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/ubuntu
+{
+	"name": "dapr-python-subscriber",
+	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+	"image": "mcr.microsoft.com/devcontainers/base:jammy",
+	"runArgs": [
+		"--network",
+		"host"
+	],
+	"features": {
+		"ghcr.io/devcontainers/features/python": {
+			"version": "3.11",
+			"installTools": true
+		},
+		"ghcr.io/devcontainers/features/azure-cli:1": {},
+		"ghcr.io/stuartleeks/dev-container-features/azure-cli-persistence:0": {},
+		"ghcr.io/stuartleeks/dev-container-features/shell-history:0": {},
+		"ghcr.io/stuartleeks/dev-container-features-playground/dapr-cli:0": {
+			"version": "latest"
+		},
+		// // TODO:
+		// // - decide on docker-outside-of-docker vs docker-in-docker
+		"ghcr.io/devcontainers/features/docker-outside-of-docker:2": {},
+		// "ghcr.io/devcontainers/features/docker-in-docker": {},
+		"ghcr.io/devcontainers/features/kubectl-helm-minikube": {
+			"helm": "3.10.1",
+			"minikube": "none"
+		},
+		"ghcr.io/guiyomh/features/just": {}
+	},
+	// "postCreateCommand": ".devcontainer/post-create.sh",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"humao.rest-client",
+				"ms-python.python",
+				"ms-azuretools.vscode-dapr" // TODO - add this to dapr-cli feature? (may need renaming)
+			]
+		}
+	}
+}
