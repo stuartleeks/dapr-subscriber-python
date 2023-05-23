@@ -3,7 +3,10 @@
 {
 	"name": "dapr-python-subscriber",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	"image": "mcr.microsoft.com/devcontainers/base:jammy",
+	"build": {
+		// Path is relataive to the devcontainer.json file.
+		"dockerfile": "Dockerfile"
+	},
 	"runArgs": [
 		"--network",
 		"host"
@@ -35,6 +38,7 @@
 			"extensions": [
 				"humao.rest-client",
 				"ms-python.python",
+				"ms-azuretools.vscode-bicep",
 				"ms-azuretools.vscode-dapr" // TODO - add this to dapr-cli feature? (may need renaming)
 			]
 		}

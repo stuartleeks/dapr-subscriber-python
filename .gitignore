@@ -1,1 +1,9 @@
 __pycache__
+
+azuredeploy.parameters.json
+output.bak
+output.json
+
+.env
+
+*.secret.*

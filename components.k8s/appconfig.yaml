@@ -1,0 +1,11 @@
+apiVersion: dapr.io/v1alpha1
+kind: Configuration
+metadata:
+  name: daprsystem
+  namespace: default
+spec:
+  logging:
+    apiLogging:
+      enabled: true
+      obfuscateURLs: true
+      omitHealthChecks: true
