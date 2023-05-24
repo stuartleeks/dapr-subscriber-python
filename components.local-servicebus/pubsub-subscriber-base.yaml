@@ -1,7 +1,7 @@
 apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:
-  name: notifications-pubsub
+  name: notifications-pubsub-subscriber
 spec:
   type: pubsub.azure.servicebus.topics
   initTimeout: 1m
@@ -24,14 +24,14 @@ spec:
   - name: maxConcurrentHandlers
     value: 20
   - name: publishMaxRetries
-    value: 100
-  - name: publishInitialRetryInternalInMs
     value: 10
+  # - name: publishInitialRetryInternalInMs
+  #   value: 10
   - name: maxDeliveryCount
-    value: 999
+    value: 10
   - name: maxActiveMessages
     value: 20
-  - name: disableEntityManagement
-    value: "true"
+  # - name: disableEntityManagement
+  #   value: "true"
 auth:
   secretStore: local-secret-store

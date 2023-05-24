@@ -17,12 +17,22 @@ def dapr_subscribe():
     print(
         "🔔 In /dapr/subscribe - returning subscriptions for notifications-pubsub-subscriber1 & notifications-pubsub-subscriber2 ")
     return [
+        # notifications-pubsub-subscriber doesn't specify consumerID so will use app-id
+        # as the consumerID/subscription name
         {
-            "pubsubname": "notifications-pubsub-subscriber1",
+            "pubsubname": "notifications-pubsub-subscriber",
+            "topic": "task-notifications",
+            "route": "new-tasks-notification-subscriber",
+        },
+        # notifications-pubsub-subscriber-1 specifies consumerID as task-notification-subscriber-1
+        {
+            "pubsubname": "notifications-pubsub-subscriber-1",
             "topic": "task-notifications",
             "route": "new-tasks-notification-subscriber-1",
-        }, {
-            "pubsubname": "notifications-pubsub-subscriber2",
+        },
+        # notifications-pubsub-subscriber-2 specifies consumerID as task-notification-subscriber-2
+        {
+            "pubsubname": "notifications-pubsub-subscriber-2",
             "topic": "task-notifications",
             "route": "new-tasks-notification-subscriber-2",
         }
@@ -40,6 +50,13 @@ class CloudEvent(BaseModel):
     tracestate: str
     type: str
     traceid: str
+
+
+@app.post("/new-tasks-notification-subscriber")
+async def new_notification(notification: CloudEvent):
+    message_id = notification.data["id"]
+    print(f"🔔 new notification (subscriber): id={message_id}")
+    print(f"message: {notification.data['message']}")
 
 
 @app.post("/new-tasks-notification-subscriber-1")

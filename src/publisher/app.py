@@ -3,7 +3,7 @@ import requests
 import uuid
 
 dapr_http_port = os.getenv("DAPR_HTTP_PORT", 3500)
-pubsub_name = os.getenv("PUBSUB_NAME", "notifications-pubsub")
+pubsub_name = os.getenv("PUBSUB_NAME", "notifications-pubsub-publisher")
 topic_name = os.getenv("TOPIC_NAME", "task-notifications")
 
 base_url = f"http://localhost:{dapr_http_port}"

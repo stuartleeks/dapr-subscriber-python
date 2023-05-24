@@ -24,11 +24,11 @@ spec:
   - name: maxConcurrentHandlers
     value: 20
   - name: publishMaxRetries
-    value: 100
-  - name: publishInitialRetryInternalInMs
     value: 10
+  # - name: publishInitialRetryInternalInMs
+  #   value: 10
   - name: maxDeliveryCount
-    value: 999
+    value: 10
   - name: maxActiveMessages
     value: 20
   - name: disableEntityManagement
