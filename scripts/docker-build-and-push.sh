@@ -17,5 +17,8 @@ fi
 
 az acr login --name "$acr_name"
 
-docker build -t "$acr_login_server/subscriber" src/subscriber
-docker push "$acr_login_server/subscriber"
+docker build -t "$acr_login_server/subscriber-dapr-api" src/subscriber-dapr-api
+docker push "$acr_login_server/subscriber-dapr-api"
+
+docker build -t "$acr_login_server/subscriber-dapr-simplified" src/subscriber-dapr-simplified
+docker push "$acr_login_server/subscriber-dapr-simplified"

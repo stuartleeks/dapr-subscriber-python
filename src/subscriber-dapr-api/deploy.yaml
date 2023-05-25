@@ -1,28 +1,28 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: subscriber
+  name: subscriber-dapr-api
   labels:
-    app: subscriber
+    app: subscriber-dapr-api
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: subscriber
+      app: subscriber-dapr-api
   template:
     metadata:
       labels:
-        app: subscriber
+        app: subscriber-dapr-api
       annotations:
         # https://docs.dapr.io/reference/arguments-annotations-overview/
         dapr.io/enabled: "true"
-        dapr.io/app-id: "subscriber"
+        dapr.io/app-id: "subscriber-dapr-api"
         dapr.io/app-port: "8000"
         dapr.io/enable-api-logging: "true"
     spec:
       containers:
-      - name: subscriber
-        image: $REGISTRY_NAME/subscriber:latest
+      - name: subscriber-dapr-api
+        image: $REGISTRY_NAME/subscriber-dapr-api:latest
         ports:
         - containerPort: 8000
         imagePullPolicy: Always

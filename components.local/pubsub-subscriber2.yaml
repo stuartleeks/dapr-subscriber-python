@@ -3,6 +3,7 @@ kind: Component
 metadata:
   name: notifications-pubsub-subscriber-2
 spec:
+  # https://docs.dapr.io/reference/components-reference/supported-pubsub/setup-azure-servicebus-topics/
   type: pubsub.azure.servicebus.topics
   initTimeout: 1m
   version: v1
@@ -14,15 +15,15 @@ spec:
       name: SERVICE_BUS_CONNECTION_STRING
       key: SERVICE_BUS_CONNECTION_STRING
   - name: handlerTimeoutInSec
-    value: 5
+    value: 120
   - name: timeoutInSec
     value: 5
   - name: lockDurationInSec
-    value: 2
+    value: 3
   - name: lockRenewalInSec
     value: 2
   - name: defaultMessageTimeToLiveInSec
-    value: 999
+    value: 2592000 # 30 * 24 * 60 * 60 
   - name: maxConcurrentHandlers
     value: 20
   - name: publishMaxRetries
@@ -30,7 +31,7 @@ spec:
   # - name: publishInitialRetryInternalInMs
   #   value: 10
   - name: maxDeliveryCount
-    value: 999
+    value: 10
   - name: maxActiveMessages
     value: 20
   - name: disableEntityManagement

@@ -16,8 +16,9 @@ id = str(uuid.uuid4())
 result = requests.post(
     url=f"{base_url}/v1.0/publish/{pubsub_name}/{topic_name}",
     json={
-        "id": id,
-        "message": "Hello"
+        "entity_id": id,
+        "entity_type": "task",
+        "new_state": "completed"
     })
 
 if result.status_code >= 200 and result.status_code < 300:

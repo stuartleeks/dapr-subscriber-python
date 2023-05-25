@@ -44,10 +44,16 @@ cat <<EOF > "$script_dir/../src/publisher/local.secret.json"
 EOF
 echo "CREATED: local secret file for publisher"
 
-cat <<EOF > "$script_dir/../src/subscriber/local.secret.json"
+cat <<EOF > "$script_dir/../src/subscriber-dapr-api/local.secret.json"
 {
   "SERVICE_BUS_CONNECTION_STRING": "$service_bus_connection_string"
 }
 EOF
-echo "CREATED: local secret file for subscriber"
+echo "CREATED: local secret file for subscriber-dapr-api"
 
+cat <<EOF > "$script_dir/../src/subscriber-dapr-simplified/local.secret.json"
+{
+  "SERVICE_BUS_CONNECTION_STRING": "$service_bus_connection_string"
+}
+EOF
+echo "CREATED: local secret file for subscriber-dapr-simplified"

@@ -1,14 +1,13 @@
 apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:
-  name: notifications-pubsub-subscriber-2
+  name: notifications-pubsub-subscriber1
 spec:
+  # https://docs.dapr.io/reference/components-reference/supported-pubsub/setup-azure-servicebus-topics/
   type: pubsub.azure.servicebus.topics
   initTimeout: 1m
   version: v1
   metadata:
-  - name: consumerID
-    value: task-notification-subscriber-2
   - name: connectionString
     secretKeyRef:
       name: servicebus-pubsub-secret
@@ -27,5 +26,4 @@ spec:
   #   value: 20
   - name: maxDeliveryCount
     value: 10
-  - name: disableEntityManagement
-    value: "true"
+

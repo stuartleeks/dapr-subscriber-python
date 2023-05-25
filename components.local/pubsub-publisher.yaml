@@ -11,27 +11,29 @@ spec:
     secretKeyRef:
       name: SERVICE_BUS_CONNECTION_STRING
       key: SERVICE_BUS_CONNECTION_STRING
-  - name: handlerTimeoutInSec
-    value: 5
-  - name: timeoutInSec
-    value: 5
-  - name: lockDurationInSec
-    value: 2
-  - name: lockRenewalInSec
-    value: 2
-  - name: defaultMessageTimeToLiveInSec
-    value: 999
-  - name: maxConcurrentHandlers
-    value: 20
-  - name: publishMaxRetries
-    value: 10
+  # - name: handlerTimeoutInSec
+  #   value: 5
+  # - name: timeoutInSec
+  #   value: 5
+  # - name: lockDurationInSec
+  #   value: 2
+  # - name: lockRenewalInSec
+  #   value: 2
+  # - name: defaultMessageTimeToLiveInSec
+  #   value: 999
+  # - name: maxConcurrentHandlers
+  #   value: 20
+  # - name: publishMaxRetries
+  #   value: 10
   # - name: publishInitialRetryInternalInMs
   #   value: 10
   - name: maxDeliveryCount
     value: 10
-  - name: maxActiveMessages
-    value: 20
-  - name: disableEntityManagement
-    value: "true"
+  # - name: maxActiveMessages
+  #   value: 20
+
+  
+  # - name: disableEntityManagement
+  #   value: "true"
 auth:
   secretStore: local-secret-store
