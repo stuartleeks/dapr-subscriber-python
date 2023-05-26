@@ -1,4 +1,4 @@
-FROM python:3.8-slim-buster
+FROM python:3.11-slim-buster
 
 WORKDIR /app
 
@@ -8,4 +8,4 @@ RUN pip3 install -r requirements.txt
 
 COPY . .
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0"]
+CMD ["python", "app.py"]

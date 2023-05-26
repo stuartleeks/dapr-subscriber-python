@@ -22,3 +22,13 @@ echo "### Deploying subscriber-dapr-simplified"
 cat "$script_dir/../src/subscriber-dapr-simplified/deploy.yaml" \
   | REGISTRY_NAME=$acr_login_server envsubst \
   | kubectl apply -f -
+
+echo "### Deploying subscriber-sdk-direct"
+cat "$script_dir/../src/subscriber-sdk-direct/deploy.yaml" \
+  | REGISTRY_NAME=$acr_login_server envsubst \
+  | kubectl apply -f -
+
+echo "### Deploying subscriber-sdk-simplified"
+cat "$script_dir/../src/subscriber-sdk-simplified/deploy.yaml" \
+  | REGISTRY_NAME=$acr_login_server envsubst \
+  | kubectl apply -f -

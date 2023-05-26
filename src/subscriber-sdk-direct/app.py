@@ -1,8 +1,6 @@
 import asyncio
 import jsons
 import os
-from fastapi import FastAPI
-from pydantic import BaseModel
 from azure.servicebus.aio import ServiceBusClient, AutoLockRenewer, ServiceBusReceiver
 from azure.servicebus import ServiceBusReceivedMessage
 from dotenv import load_dotenv
@@ -81,12 +79,12 @@ async def process_messages(handler):
 
 async def on_task_notification(msg: CloudEvent):
     entity_id = msg.data["entity_id"]
-    print("🔔 [{entity_id}] Received message: ", msg.data, flush=True)
+    print(f"🔔 [{entity_id}] Received message: ", msg.data, flush=True)
     for i in range(0, 5):
         print(
             f"💤 [{entity_id}] sleeping to simulate long-running-work (i={i})...", flush=True)
         await asyncio.sleep(2)
-    print("✅ [{entity_id}] Done sleeping", flush=True)
+    print(f"✅ [{entity_id}] Done sleeping", flush=True)
 
 
 asyncio.run(process_messages(on_task_notification))

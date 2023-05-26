@@ -22,3 +22,9 @@ docker push "$acr_login_server/subscriber-dapr-api"
 
 docker build -t "$acr_login_server/subscriber-dapr-simplified" src/subscriber-dapr-simplified
 docker push "$acr_login_server/subscriber-dapr-simplified"
+
+docker build -t "$acr_login_server/subscriber-sdk-direct" src/subscriber-sdk-direct
+docker push "$acr_login_server/subscriber-sdk-direct"
+
+docker build -t "$acr_login_server/subscriber-sdk-simplified" src/subscriber-sdk-simplified
+docker push "$acr_login_server/subscriber-sdk-simplified"

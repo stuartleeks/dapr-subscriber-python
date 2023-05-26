@@ -24,14 +24,14 @@ run-subscriber-sdk-direct:
 # run the subscriber-sdk-simplified app locally to receive messages
 run-subscriber-sdk-simplified:
 	cd src/subscriber-sdk-simplified && \
-	python app.py
+	DEFAULT_SUBSCRIPTION_NAME=subscriber-sdk-simplified python app.py
 
 # run the publisher locally to submit a message
 run-publisher topic="task" count="1":
 	cd src/publisher && \
 	dapr run --app-id publisher --app-port 8001 --resources-path ../../components.local/ -- python app.py {{topic}} {{count}}
 
-# deploy (create AKS cluster, deploy dapr components etc)
+# deploy (create AKS cluster, deploy dapr components, services etc)
 deploy:
 	./deploy.sh
 
@@ -40,10 +40,10 @@ get-kubectl-credentials:
 	./scripts/get-kube-login.sh
 
 
-# build Dapr services (useful if you want to deploy updates to the components)
-build-dapr:
+# build and push subscriber images (useful if you want to deploy updates to the services)
+build-images:
 	./scripts/docker-build-and-push.sh
 
-# deploy Dapr components (useful if you want to deploy updates to the components)
-deploy-dapr:
-	./scripts/dapr-deploy.sh
+# deploy subscribers to Kubernetes components (useful if you want to deploy updates to the services)
+deploy-to-k8s:
+	./scripts/deploy-to-k8s.sh

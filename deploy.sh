@@ -21,5 +21,5 @@ $script_dir/scripts/create-env-files-from-output.sh
 echo "### Getting kubectl credentials"
 $script_dir/scripts/get-kube-login.sh
 
-echo "### Deplying dapr components/services"
-$script_dir/scripts/dapr-deploy.sh
+echo "### Deplying components/services to Kubernetes"
+$script_dir/scripts/deploy-to-k8s.sh
