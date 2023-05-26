@@ -2,6 +2,7 @@ import os
 import sys
 import requests
 import uuid
+from timeit import default_timer as timer
 
 dapr_http_port = os.getenv("DAPR_HTTP_PORT", 3500)
 pubsub_name = os.getenv("PUBSUB_NAME", "notifications-pubsub-publisher")
@@ -25,6 +26,7 @@ base_url = f"http://localhost:{dapr_http_port}"
 
 
 print(f"🏃 Publishing {count} message(s) to topic '{topic_name}' in pubsub '{pubsub_name}'...")
+start = timer()
 
 for i in range(0, count):
     # generate a new uuid
@@ -42,4 +44,6 @@ for i in range(0, count):
     else:
         print(f"ℹ❌ Failed to publish message. status code: {result.status_code}, response: '{result.text}'")
 
-print("👋 Done!")
+end = timer()
+duration = end - start
+print(f"👋 Done! (took {duration} seconds for {count} messages)")

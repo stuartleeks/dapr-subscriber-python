@@ -13,6 +13,7 @@ from PubSub.ConsumerApp import ConsumerApp, CloudEvent, ConsumerResult, StateCha
 
 
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 consumer_app = ConsumerApp(
@@ -23,7 +24,7 @@ consumer_app = ConsumerApp(
 # We can consume raw cloud events:
 @consumer_app.consume
 async def on_task_notification(notification: CloudEvent):
-    print(f"🔔 new notification (auto-generated): {notification.data}", flush=True)
+    logger.info(f"🔔 new notification (auto-generated): {notification.data}")
     return ConsumerResult.SUCCESS
 
 
@@ -39,7 +40,7 @@ async def on_task_notification(notification: CloudEvent):
 @consumer_app.consume(pubsub_name="notifications-pubsub-subscriber-2")
 def on_task_notification(notification: CloudEvent):
     message_id = notification.data["id"]
-    print(f"🔔 new notification (subscriber-2): id={message_id}")
+    logger.info(f"🔔 new notification (subscriber-2): id={message_id}")
 
 
 @app.get("/",)

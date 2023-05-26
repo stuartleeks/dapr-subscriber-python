@@ -6,9 +6,9 @@ import jsons
 import logging
 import os
 from typing import Optional
-from pydantic import BaseModel
 from azure.servicebus.aio import ServiceBusClient, AutoLockRenewer, ServiceBusReceiver
 from azure.servicebus import ServiceBusReceivedMessage
+from timeit import default_timer as timer
 
 from dotenv import load_dotenv
 
@@ -181,7 +181,8 @@ class ConsumerApp:
                 # TODO: Add max message count etc to config
                 received_msgs = await receiver.receive_messages(max_message_count=10, max_wait_time=30)
 
-                self.logger.debug(f"Received message batch, size =  {len(received_msgs)}")
+                self.logger.info(f"📦 Batch received, size =  {len(received_msgs)}")
+                start = timer()
 
                 # Set up message renewal for the batch
                 for msg in received_msgs:
@@ -190,6 +191,9 @@ class ConsumerApp:
 
                 # process messages in parallel
                 await asyncio.gather(*[subscription.handler(receiver, msg) for msg in received_msgs])
+                end = timer()
+                duration = end - start
+                self.logger.info(f"📦 Batch done, size={len(received_msgs)}, duration={duration}s")
 
 
     async def run(self):
