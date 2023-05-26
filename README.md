@@ -36,7 +36,7 @@ To run the code:
 - run `just run-subscriber-dapr-simplified` to run the subscriber that uses the helper code with Dapr
 - run `just run-subscriber-sdk-direct` to run the subscriber that uses the Service Bus SDK directly
 - run `just run-subscriber-sdk-simplified` to run the subscriber that uses the helper code with the Service Bus SDK
-- run `just run-publisher` to run the publisher that sends messages to the `task-notifications` topic
+- run `just run-publisher` to run the publisher that sends messages to the `task-notifications` topic. Note that you can use `just run-publisher user` to send a message to the `user-notifications` topic instead, or `just run-publisher task 5` to send 5 messages to the `task-notifications` topic.
 
 ## Helper code - Dapr
 

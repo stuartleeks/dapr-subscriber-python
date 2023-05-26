@@ -27,9 +27,9 @@ run-subscriber-sdk-simplified:
 	python app.py
 
 # run the publisher locally to submit a message
-run-publisher:
+run-publisher topic="task" count="1":
 	cd src/publisher && \
-	dapr run --app-id publisher --app-port 8001 --resources-path ../../components.local/ python app.py
+	dapr run --app-id publisher --app-port 8001 --resources-path ../../components.local/ -- python app.py {{topic}} {{count}}
 
 # deploy (create AKS cluster, deploy dapr components etc)
 deploy:
