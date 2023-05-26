@@ -1,0 +1,5 @@
+azure-servicebus
+azure-identity
+aiohttp
+python-dotenv
+jsons

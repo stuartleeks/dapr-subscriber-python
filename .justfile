@@ -11,10 +11,20 @@ run-subscriber-dapr-api env="redis":
 	cd src/subscriber-dapr-api && \
 	dapr run --app-id subscriber-dapr-api --app-port 8000 --resources-path ../../components.local/ -- uvicorn app:app --reload 
 
-# run the subscriber0simplified app locally to receive messages
+# run the subscriber-dapr-simplified app locally to receive messages
 run-subscriber-dapr-simplified:
 	cd src/subscriber-dapr-simplified && \
 	dapr run --app-id subscriber-dapr-simplified --app-port 8002 --resources-path ../../components.local/ -- uvicorn --port 8002 app:app --reload 
+
+# run the subscriber-sdk-direct app locally to receive messages
+run-subscriber-sdk-direct:
+	cd src/subscriber-sdk-direct && \
+	python app.py
+
+# run the subscriber-sdk-simplified app locally to receive messages
+run-subscriber-sdk-simplified:
+	cd src/subscriber-sdk-simplified && \
+	python app.py
 
 # run the publisher locally to submit a message
 run-publisher:

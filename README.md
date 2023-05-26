@@ -19,8 +19,11 @@ Within the repo, you'll find:
 - `scripts` folder containing helper scripts to configure/deploy the sample
 
 Under `src` there are several folders:
+- `publisher` contains the code for the publisher that sends messages to Service Bus
 - `subscriber-dapr-api` contains the code for the subscriber using the Dapr API directly
-- `subscriber-dapr-simplified` contains the code for the simplified subscriber code using the helper code to simplify the Dapr usage
+- `subscriber-dapr-simplified` contains the code for the simplified subscriber code using helper code to simplify the Dapr usage
+- `subscriber-sdk-direct` contains the code for the subscriber that directly uses the Service Bus SDK
+- `subscriber-sdk-simplified` contains the code for the simplified subscriber code using helper code to simplify the Service Bus SDK usage
 
 ## Running locally
 
@@ -31,9 +34,11 @@ To set up your local Dapr environment, run `dapr init`
 To run the code:
 - run `just run-subscriber-dapr-api` to run the subscriber that uses the Dapr API directly
 - run `just run-subscriber-dapr-simplified` to run the subscriber that uses the helper code with Dapr
+- run `just run-subscriber-sdk-direct` to run the subscriber that uses the Service Bus SDK directly
+- run `just run-subscriber-sdk-simplified` to run the subscriber that uses the helper code with the Service Bus SDK
 - run `just run-publisher` to run the publisher that sends messages to the `task-notifications` topic
 
-## Helper code
+## Helper code - Dapr
 
 ### Overview
 
@@ -97,7 +102,7 @@ async def on_user_notification(state_changed_event: StateChangeEvent):
 
 ```
 
-### Multiple subscribers to the same event type in a single app
+### Multiple subscribers to the same event type in a single app (Dapr)
 
 The previous examples all use a common Dapr pubsub component.
 That pubsub component doesn't configure the `consumerID` property that determines which Service Bus subscription to use.
@@ -122,5 +127,52 @@ async def on_task_notification1(state_changed_event: StateChangeEvent):
 @consumer_app.consume(pubsub_name="notifications-pubsub-subscriber2")
 async def on_task_notification2(state_changed_event: StateChangeEvent):
     print(f"🔔 new task state changed event - handler 2: {state_changed_event}")
+    return ConsumerResult.SUCCESS
+```
+
+## Helper code - Service Bus SDK
+
+### Overview
+
+In the `subscriber-dapr-simplified` folder, you'll find a `consumer_app.py` file under the `PubSub` folder that contains the helper code.
+This is an experiment, but the idea is to provide a simple way to consume messages using Dapr pubsub without having to worry about the details of the Dapr API.
+
+The `ConsumerApp` class provides a simple way to register functions as subscribers to topics.
+It uses a convention-based approach to determine the topic name name to use.
+It also provides a way to customise the topic name and subscriber name if needed.
+
+The code to use this `ConsumerApp` looks very similar to the code for the Dapr helper version:
+
+```python
+consumer_app = ConsumerApp()
+
+# We can consume raw cloud events:
+@consumer_app.consume
+async def on_task_notification(notification: CloudEvent):
+    print(f"🔔 new task state changed event: {state_changed_event}")
+    return ConsumerResult.SUCCESS
+```
+
+In the example above, the `on_task_notification` function will be registered as a subscriber to the `task-notifications` topic (based on the method name).
+The handler in this example takes a `CloudEvent`, but can also take a strongly typed model:
+
+```python
+# Or we can consume strongly typed events:
+@consumer_app.consume
+async def on_task_notification(state_changed_event: StateChangeEvent):
+    print(f"🔔 new task state changed event: {state_changed_event}")
+    return ConsumerResult.SUCCESS
+```
+
+### Multiple subscribers to the same event type in a single app (SDK)
+
+The previous examples all use a common Service Bus subscription name across topics.
+This means that you cannot have multiple subscribers for the same event type in the same app using this approach.
+However, the `consume` method allows you to specify a custom subscription name to use:
+
+```python
+@consumer_app.consume(subscription_name="my-custom-subscription")
+async def on_task_notification(state_changed_event: StateChangeEvent):
+    print(f"🔔 new task state changed event: {state_changed_event}")
     return ConsumerResult.SUCCESS
 ```

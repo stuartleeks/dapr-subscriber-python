@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: subscriber-sdk-direct
+  labels:
+    app: subscriber-sdk-direct
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: subscriber-sdk-direct
+  template:
+    metadata:
+      labels:
+        app: subscriber-sdk-direct
+    spec:
+      containers:
+      - name: subscriber-sdk-direct
+        image: $REGISTRY_NAME/subscriber-sdk-direct:latest
+        ports:
+        - containerPort: 8000
+        imagePullPolicy: Always
+        # TODO - set env vars for connection string, topic name, subscription name

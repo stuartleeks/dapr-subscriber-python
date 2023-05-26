@@ -57,3 +57,14 @@ cat <<EOF > "$script_dir/../src/subscriber-dapr-simplified/local.secret.json"
 }
 EOF
 echo "CREATED: local secret file for subscriber-dapr-simplified"
+
+
+cat <<EOF > "$script_dir/../src/subscriber-sdk-direct/.env"
+SERVICE_BUS_CONNECTION_STRING="$service_bus_connection_string"
+EOF
+echo "CREATED: env file for SDK subscriber-sdk-direct"
+
+cat <<EOF > "$script_dir/../src/subscriber-sdk-simplified/.env"
+SERVICE_BUS_CONNECTION_STRING="$service_bus_connection_string"
+EOF
+echo "CREATED: env file for SDK subscriber-sdk-simplified"

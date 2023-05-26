@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: subscriber-sdk-simplified
+  labels:
+    app: subscriber-sdk-simplified
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: subscriber-sdk-simplified
+  template:
+    metadata:
+      labels:
+        app: subscriber-sdk-simplified
+    spec:
+      containers:
+      - name: subscriber-sdk-simplified
+        image: $REGISTRY_NAME/subscriber-sdk-simplified:latest
+        ports:
+        - containerPort: 8000
+        imagePullPolicy: Always
+        # TODO - set env vars for connection string, topic name, subscription name

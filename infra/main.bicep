@@ -79,6 +79,8 @@ resource serviceBusNamespace 'Microsoft.ServiceBus/namespaces@2021-11-01' = {
   properties: {}
 }
 
+// task-notifications topic + subscriptions
+
 resource taskNotificationsTopic 'Microsoft.ServiceBus/namespaces/topics@2021-11-01' = {
   parent: serviceBusNamespace
   name: 'task-notifications'
@@ -101,6 +103,40 @@ resource taskNotificationSubscriber2 'Microsoft.ServiceBus/namespaces/topics/sub
     maxDeliveryCount: 10
   }
 }
+
+resource taskNotificationSubscriberSdkDirect 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2021-11-01' = {
+  parent: taskNotificationsTopic
+  name: 'subscriber-sdk-direct'
+  properties: {
+    lockDuration: 'PT5M'
+    maxDeliveryCount: 10
+  }
+}
+resource taskNotificationSubscriberSdkSimplified 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2021-11-01' = {
+  parent: taskNotificationsTopic
+  name: 'subscriber-sdk-simplified'
+  properties: {
+    lockDuration: 'PT5M'
+    maxDeliveryCount: 10
+  }
+}
+
+// user-notifications topic + subscriptions
+
+resource userNotificationsTopic 'Microsoft.ServiceBus/namespaces/topics@2021-11-01' = {
+  parent: serviceBusNamespace
+  name: 'user-notifications'
+  properties: {}
+}
+resource userNotificationSubscriberSdkSimplified 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2021-11-01' = {
+  parent: userNotificationsTopic
+  name: 'subscriber-sdk-simplified'
+  properties: {
+    lockDuration: 'PT5M'
+    maxDeliveryCount: 10
+  }
+}
+
 
 output acr_name string = containerRegistry.name
 output acr_login_server string = containerRegistry.properties.loginServer
