@@ -1,6 +1,6 @@
-# dapr-python-subscriber
+# python-service-bus-subscribers
 
-This repo is a sample showing how to consume messages using a Dapr pubsub component using Python. Additionally, it includes an exploration of ways to abstract away large parts of the considerations to simplify the developer experience for consuming messages using a combination of helper code and conventions.
+This repo is a sample showing how to consume messages from Azure Service Bus using Python. Additionally, it includes an exploration of ways to abstract away large parts of the considerations to simplify the developer experience for consuming messages using a combination of helper code and conventions. 
 
 
 ## Deploying the sample
