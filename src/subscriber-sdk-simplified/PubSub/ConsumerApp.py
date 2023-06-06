@@ -114,13 +114,17 @@ class ConsumerApp:
         self.max_wait_time = max_wait_time
         self.max_lock_renewal_duration = max_lock_renewal_duration
 
-    def _get_notification_type_from_method(func):
+    def _get_topic_name_from_method(func):
         function_name = func.__name__
         if not function_name.startswith("on_"):
             raise Exception(
-                f"Function name must be in the form on_<topic_name>_notification")
-        notification_type = function_name.split("_")[1]
-        return notification_type
+                f"Function name must be in the form on_<entity-name>_<event-name>")
+        parts = function_name.split("_")
+        if len(parts) < 3:
+            raise Exception(
+                f"Function name must be in the form on_<entity-name>_<event-name>")
+        topic_name = f"{parts[1]}-{parts[2]}"
+        return topic_name
 
     def _get_payload_converter_from_method(func):
         argspec = inspect.getfullargspec(func)
@@ -157,7 +161,7 @@ class ConsumerApp:
             nonlocal subscription_name
             nonlocal topic_name
 
-            notification_type = ConsumerApp._get_notification_type_from_method(
+            notification_type = ConsumerApp._get_topic_name_from_method(
                 func)
 
             if subscription_name is None:
@@ -165,12 +169,12 @@ class ConsumerApp:
             # TODO validate notification_type is a valid base for topic name?
 
             if topic_name is None:
-                topic_name = notification_type + "-notifications"
+                topic_name = notification_type
                 self.logger.info(
                     f"topic_name not set, using topic_name from function name: {topic_name}")
 
             self.logger.info(
-                f"👂 Adding subscription: {subscription_name}/{topic_name}")
+                f"👂 Adding subscription: {topic_name}/{subscription_name}")
 
             payload_converter = ConsumerApp._get_payload_converter_from_method(
                 func)

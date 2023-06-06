@@ -23,14 +23,14 @@ consumer_app = ConsumerApp(
 
 # We can consume raw cloud events:
 @consumer_app.consume
-async def on_task_notification(notification: CloudEvent):
+async def on_task_created(notification: CloudEvent):
     logger.info(f"🔔 new notification (auto-generated): {notification.data}")
     return ConsumerResult.SUCCESS
 
 
 # Or we can consume strongly typed events:
 # @consumer_app.consume
-# async def on_task_notification(state_changed_event: StateChangeEvent):
+# async def on_task_created(state_changed_event: StateChangeEvent):
 #     print(f"🔔 new state changed event: {state_changed_event}")
 #     return ConsumerResult.SUCCESS
 
@@ -38,9 +38,8 @@ async def on_task_notification(notification: CloudEvent):
 # Can also specify pubsub_name and/or topic_name explicitly via the decorator:
 # notifications-pubsub-subscriber-2 specifies consumerID as task-notification-subscriber-2
 @consumer_app.consume(pubsub_name="notifications-pubsub-subscriber-2")
-def on_task_notification(notification: CloudEvent):
-    message_id = notification.data["id"]
-    logger.info(f"🔔 new notification (subscriber-2): id={message_id}")
+def on_task_created(notification: CloudEvent):
+    logger.info(f"🔔 new notification (subscriber-2): {notification.data}")
 
 
 @app.get("/",)

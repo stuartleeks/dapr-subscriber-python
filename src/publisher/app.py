@@ -7,23 +7,20 @@ from timeit import default_timer as timer
 dapr_http_port = os.getenv("DAPR_HTTP_PORT", 3500)
 pubsub_name = os.getenv("PUBSUB_NAME", "notifications-pubsub-publisher")
 
-allowed_topics = ["task", "user"]
+allowed_topics = ["task-created", "task-updated", "user-created", "user-inactive"]
 
 if len(sys.argv) != 3:
     print(f"ℹ  Usage: {sys.argv[0]} <{'|'.join(allowed_topics)}> <count>")
     sys.exit(1)
 
-topic_base = sys.argv[1]
-if topic_base not in allowed_topics:
-    print(f"ℹ Invalid topic_base: {topic_base}")
+topic_name = sys.argv[1]
+if topic_name not in allowed_topics:
+    print(f"ℹ Invalid topic_base: {topic_name}")
     sys.exit(1)
-topic_name = f"{topic_base}-notifications"
 
 count = int(sys.argv[2])
 
-
 base_url = f"http://localhost:{dapr_http_port}"
-
 
 print(f"🏃 Publishing {count} message(s) to topic '{topic_name}' in pubsub '{pubsub_name}'...")
 start = timer()

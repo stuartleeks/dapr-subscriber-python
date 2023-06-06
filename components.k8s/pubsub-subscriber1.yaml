@@ -9,7 +9,7 @@ spec:
   version: v1
   metadata:
   - name: consumerID
-    value: task-notification-subscriber-1
+    value: task-created-subscriber-1
   - name: connectionString
     secretKeyRef:
       name: servicebus-pubsub-secret

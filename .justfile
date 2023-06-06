@@ -27,7 +27,7 @@ run-subscriber-sdk-simplified:
 	DEFAULT_SUBSCRIPTION_NAME=subscriber-sdk-simplified python app.py
 
 # run the publisher locally to submit a message
-run-publisher topic="task" count="1":
+run-publisher topic="task-created" count="1":
 	cd src/publisher && \
 	dapr run --app-id publisher --app-port 8001 --resources-path ../../components.local/ -- python app.py {{topic}} {{count}}
 

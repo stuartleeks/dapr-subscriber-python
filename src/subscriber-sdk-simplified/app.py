@@ -29,32 +29,36 @@ consumer_app = ConsumerApp()
 
 
 # @consumer_app.consume
-# async def on_task_notification(notification: CloudEvent):
+# async def on_task_created(notification: CloudEvent):
 #     print("🔔 [{entity_id}] Received message: ", notification.data, flush=True)
 #     entity_id = notification.data["entity_id"]
 #     await simulate_long_running(entity_id)
 #     return ConsumerResult.SUCCESS
 
-
 # Or we can consume strongly typed events:
 @consumer_app.consume
-async def on_task_notification(state_changed_event: StateChangeEvent):
-    logger.info(f"🔔 new task state changed event: {state_changed_event}")
+async def on_task_created(state_changed_event: StateChangeEvent):
+    logger.info(f"🔔 new task-created event: {state_changed_event}")
+    # await simulate_long_running(state_changed_event.entity_id)
+    return ConsumerResult.SUCCESS
+
+@consumer_app.consume
+async def on_task_updated(state_changed_event: StateChangeEvent):
+    logger.info(f"🔔 new task-updated event: {state_changed_event}")
     # await simulate_long_running(state_changed_event.entity_id)
     return ConsumerResult.SUCCESS
 
 
 @consumer_app.consume
-async def on_user_notification(state_changed_event: StateChangeEvent):
-    logger.info(f"🔔 new user state changed event: {state_changed_event}")
+async def on_user_created(state_changed_event: StateChangeEvent):
+    logger.info(f"🔔 new user-created event: {state_changed_event}")
     # await simulate_long_running(state_changed_event.entity_id)
     return ConsumerResult.SUCCESS
 
 
-# # Can also specify pubsub_name and/or topic_name explicitly via the decorator:
-# # notifications-pubsub-subscriber-2 specifies consumerID as task-notification-subscriber-2
-# @consumer_app.consume(pubsub_name="notifications-pubsub-subscriber-2")
-# def on_task_notification(notification: CloudEvent):
+# # Can also specify topic_name/subscription_name explicitly via the decorator
+# @consumer_app.consume(topic_name="task-created" pubsub_name="subscriber-sdk-simplified")
+# def non_conventional_method_name(notification: CloudEvent):
 #     message_id = notification.data["id"]
 #     print(f"🔔 new notification (subscriber-2): id={message_id}")
 

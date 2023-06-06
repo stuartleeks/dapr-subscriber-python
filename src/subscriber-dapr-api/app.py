@@ -37,27 +37,27 @@ def dapr_subscribe():
         # as the consumerID/subscription name
         {
             "pubsubname": "notifications-pubsub-subscriber",
-            "topic": "task-notifications",
-            "route": "new-tasks-notification-subscriber",
+            "topic": "task-created",
+            "route": "task-created-subscriber",
         },
-        # notifications-pubsub-subscriber-1 specifies consumerID as task-notification-subscriber-1
+        # notifications-pubsub-subscriber-1 specifies consumerID as task-created-subscriber-1
         {
             "pubsubname": "notifications-pubsub-subscriber-1",
-            "topic": "task-notifications",
-            "route": "new-tasks-notification-subscriber-1",
+            "topic": "task-created",
+            "route": "task-created-subscriber-1",
         },
-        # # notifications-pubsub-subscriber-2 specifies consumerID as task-notification-subscriber-2
-        # {
-        #     "pubsubname": "notifications-pubsub-subscriber-2",
-        #     "topic": "task-notifications",
-        #     "route": "new-tasks-notification-subscriber-2",
-        # }
+        # notifications-pubsub-subscriber-2 specifies consumerID as task-created-subscriber-2
+        {
+            "pubsubname": "notifications-pubsub-subscriber-2",
+            "topic": "task-created",
+            "route": "task-created-subscriber-2",
+        }
     ]
 
 
-@app.post("/new-tasks-notification-subscriber")
+@app.post("/task-created-subscriber")
 def new_notification(notification: CloudEvent):
-    print(f"🔔 new notification (subscriber): {notification.data}")
+    print(f"🔔 new task-created notification (subscriber): {notification.data}")
 
     # pubsub API docs (response format): https://docs.dapr.io/reference/api/pubsub_api/#expected-http-response
     # return {"status": "SUCCESS"} # <--- default response that is assumed for success status codes
@@ -65,14 +65,14 @@ def new_notification(notification: CloudEvent):
     # return {"status": "DROP"}
 
 
-@app.post("/new-tasks-notification-subscriber-1")
+@app.post("/task-created-subscriber-1")
 def new_notification(notification: CloudEvent):
-    print(f"🔔 new notification (subscriber-1): {notification.data}")
+    print(f"🔔 new task-created notification (subscriber-1): {notification.data}")
 
 
-@app.post("/new-tasks-notification-subscriber-2")
+@app.post("/task-created-subscriber-2")
 def new_notification(notification: CloudEvent):
-    print(f"🔔 new notification (subscriber-2): {notification.data}")
+    print(f"🔔 new task-created notification (subscriber-2): {notification.data}")
 
 
 print("🏃 Subscriber starting...")

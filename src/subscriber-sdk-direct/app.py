@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 CONNECTION_STR = os.environ.get('SERVICE_BUS_CONNECTION_STRING')
-TOPIC_NAME = "task-notifications"
+TOPIC_NAME = "task-created"
 SUBSCRIPTION_NAME = "subscriber-sdk-direct"
 
 # This app uses cloud events because the messages publisher uses cloud events via Dapr

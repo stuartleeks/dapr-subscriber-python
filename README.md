@@ -36,7 +36,7 @@ To run the code:
 - run `just run-subscriber-dapr-simplified` to run the subscriber that uses the helper code with Dapr
 - run `just run-subscriber-sdk-direct` to run the subscriber that uses the Service Bus SDK directly
 - run `just run-subscriber-sdk-simplified` to run the subscriber that uses the helper code with the Service Bus SDK
-- run `just run-publisher` to run the publisher that sends messages to the `task-notifications` topic. Note that you can use `just run-publisher user` to send a message to the `user-notifications` topic instead, or `just run-publisher task 5` to send 5 messages to the `task-notifications` topic.
+- run `just run-publisher` to run the publisher that sends messages to the `task-created` topic. Note that you can use `just run-publisher user-created` to send a message to the `user-created` topic instead, or `just run-publisher task-created 5` to send 5 messages to the `task-created` topic.
 
 ## Helper code - Dapr
 
@@ -67,17 +67,17 @@ consumer_app = ConsumerApp(
 
 # We can consume raw cloud events:
 @consumer_app.consume
-async def on_task_notification(notification: CloudEvent):
+async def on_task_created(notification: CloudEvent):
     print(f"🔔 new notification: {notification.data}", flush=True)
     return ConsumerResult.SUCCESS
 ```
 
-In the example above, the `on_task_notification` function will be registered as a subscriber to the `task-notifications` topic (based on the method name).
+In the example above, the `on_task_created` function will be registered as a subscriber to the `task-created` topic (based on the method name).
 This example shows how to consume raw cloud events, but you can also consume messages as a strongly typed model:
 
 ```python
 @consumer_app.consume
-async def on_task_notification(state_changed_event: StateChangeEvent):
+async def on_task_created(state_changed_event: StateChangeEvent):
     print(f"🔔 new state changed event: {state_changed_event}")
     return ConsumerResult.SUCCESS
 ```
@@ -91,13 +91,18 @@ To bind to multiple event types, you add new methods and name based on the event
 
 ```python
 @consumer_app.consume
-async def on_task_notification(state_changed_event: StateChangeEvent):
-    print(f"🔔 new task state changed event: {state_changed_event}")
+async def on_task_created(state_changed_event: StateChangeEvent):
+    print(f"🔔 new task created event: {state_changed_event}")
     return ConsumerResult.SUCCESS
 
 @consumer_app.consume
-async def on_user_notification(state_changed_event: StateChangeEvent):
-    print(f"🔔 new user state changed event: {state_changed_event}")
+async def on_task_updated(state_changed_event: StateChangeEvent):
+    logger.info(f"🔔 new task-updated event: {state_changed_event}")
+    return ConsumerResult.SUCCESS
+
+@consumer_app.consume
+async def on_user_created(state_changed_event: StateChangeEvent):
+    print(f"🔔 new user created event: {state_changed_event}")
     return ConsumerResult.SUCCESS
 
 ```
@@ -120,13 +125,13 @@ If you want to have multiple different subscriptions for the same event type in 
 # each with a different consumerID configured
 
 @consumer_app.consume(pubsub_name="notifications-pubsub-subscriber1")
-async def on_task_notification1(state_changed_event: StateChangeEvent):
-    print(f"🔔 new task state changed event - handler 1: {state_changed_event}")
+async def on_task_created(state_changed_event: StateChangeEvent):
+    print(f"🔔 new task created event - handler 1: {state_changed_event}")
     return ConsumerResult.SUCCESS
 
 @consumer_app.consume(pubsub_name="notifications-pubsub-subscriber2")
-async def on_task_notification2(state_changed_event: StateChangeEvent):
-    print(f"🔔 new task state changed event - handler 2: {state_changed_event}")
+async def on_task_created_2(state_changed_event: StateChangeEvent):
+    print(f"🔔 new task created event - handler 2: {state_changed_event}")
     return ConsumerResult.SUCCESS
 ```
 
@@ -148,19 +153,19 @@ consumer_app = ConsumerApp()
 
 # We can consume raw cloud events:
 @consumer_app.consume
-async def on_task_notification(notification: CloudEvent):
-    print(f"🔔 new task state changed event: {state_changed_event}")
+async def on_task_created(notification: CloudEvent):
+    print(f"🔔 new task created event: {state_changed_event}")
     return ConsumerResult.SUCCESS
 ```
 
-In the example above, the `on_task_notification` function will be registered as a subscriber to the `task-notifications` topic (based on the method name).
+In the example above, the `on_task_created` function will be registered as a subscriber to the `task-created` topic (based on the method name).
 The handler in this example takes a `CloudEvent`, but can also take a strongly typed model:
 
 ```python
 # Or we can consume strongly typed events:
 @consumer_app.consume
-async def on_task_notification(state_changed_event: StateChangeEvent):
-    print(f"🔔 new task state changed event: {state_changed_event}")
+async def on_task_created(state_changed_event: StateChangeEvent):
+    print(f"🔔 new task created event: {state_changed_event}")
     return ConsumerResult.SUCCESS
 ```
 
@@ -171,8 +176,8 @@ This means that you cannot have multiple subscribers for the same event type in 
 However, the `consume` method allows you to specify a custom subscription name to use:
 
 ```python
-@consumer_app.consume(subscription_name="my-custom-subscription")
-async def on_task_notification(state_changed_event: StateChangeEvent):
-    print(f"🔔 new task state changed event: {state_changed_event}")
+@consumer_app.consume(topic_name="task-created", subscription_name="my-custom-subscription")
+async def handle_notifications(state_changed_event: StateChangeEvent):
+    print(f"🔔 new task created event: {state_changed_event}")
     return ConsumerResult.SUCCESS
 ```

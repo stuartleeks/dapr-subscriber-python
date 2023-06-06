@@ -18,6 +18,9 @@ param aksNodeCount int = 1
 param aksVMSize string = 'Standard_B2s'
 // param aksVMSize string = 'Standard_D2s_v3'
 
+@description('The Service Bus SKU to use')
+param serviceBusSku string = 'Standard'
+
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2022-02-01-preview' = {
   name: '${envResourceNamePrefix}registry'
   location: location
@@ -74,46 +77,49 @@ resource serviceBusNamespace 'Microsoft.ServiceBus/namespaces@2021-11-01' = {
   name: '${envResourceNamePrefix}sb'
   location: location
   sku: {
-    name: 'Standard'
+    name: serviceBusSku
   }
   properties: {}
 }
 
-// task-notifications topic + subscriptions
+/////////////////////////////////////
+//
+// Task event topics
 
-resource taskNotificationsTopic 'Microsoft.ServiceBus/namespaces/topics@2021-11-01' = {
+// task-created topic + subscriptions
+resource taskCreatedTopic 'Microsoft.ServiceBus/namespaces/topics@2021-11-01' = {
   parent: serviceBusNamespace
-  name: 'task-notifications'
+  name: 'task-created'
   properties: {}
 }
 
-resource taskNotificationSubscriber1 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2021-11-01' = {
-  parent: taskNotificationsTopic
-  name: 'task-notification-subscriber-1'
+resource taskCreatedSubscriber1 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2021-11-01' = {
+  parent: taskCreatedTopic
+  name: 'task-created-subscriber-1'
   properties: {
     lockDuration: 'PT5M'
     maxDeliveryCount: 10
   }
 }
-resource taskNotificationSubscriber2 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2021-11-01' = {
-  parent: taskNotificationsTopic
-  name: 'task-notification-subscriber-2'
+resource taskCreatedSubscriber2 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2021-11-01' = {
+  parent: taskCreatedTopic
+  name: 'task-created-subscriber-2'
   properties: {
     lockDuration: 'PT5M'
     maxDeliveryCount: 10
   }
 }
 
-resource taskNotificationSubscriberSdkDirect 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2021-11-01' = {
-  parent: taskNotificationsTopic
+resource taskCreatedSubscriberSdkDirect 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2021-11-01' = {
+  parent: taskCreatedTopic
   name: 'subscriber-sdk-direct'
   properties: {
     lockDuration: 'PT5M'
     maxDeliveryCount: 10
   }
 }
-resource taskNotificationSubscriberSdkSimplified 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2021-11-01' = {
-  parent: taskNotificationsTopic
+resource taskCreatedSubscriberSdkSimplified 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2021-11-01' = {
+  parent: taskCreatedTopic
   name: 'subscriber-sdk-simplified'
   properties: {
     lockDuration: 'PT5M'
@@ -121,15 +127,14 @@ resource taskNotificationSubscriberSdkSimplified 'Microsoft.ServiceBus/namespace
   }
 }
 
-// user-notifications topic + subscriptions
-
-resource userNotificationsTopic 'Microsoft.ServiceBus/namespaces/topics@2021-11-01' = {
+// task-updated topic + subscriptions
+resource taskUpdatedTopic 'Microsoft.ServiceBus/namespaces/topics@2021-11-01' = {
   parent: serviceBusNamespace
-  name: 'user-notifications'
+  name: 'task-updated'
   properties: {}
 }
-resource userNotificationSubscriberSdkSimplified 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2021-11-01' = {
-  parent: userNotificationsTopic
+resource taskUpdatedSubscriberSdkSimplified 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2021-11-01' = {
+  parent: taskUpdatedTopic
   name: 'subscriber-sdk-simplified'
   properties: {
     lockDuration: 'PT5M'
@@ -137,6 +142,40 @@ resource userNotificationSubscriberSdkSimplified 'Microsoft.ServiceBus/namespace
   }
 }
 
+
+/////////////////////////////////////
+//
+// User event topics
+
+// user-created topic + subscriptions
+resource userCreatedTopic 'Microsoft.ServiceBus/namespaces/topics@2021-11-01' = {
+  parent: serviceBusNamespace
+  name: 'user-created'
+  properties: {}
+}
+resource userCreatedSubscriberSdkSimplified 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2021-11-01' = {
+  parent: userCreatedTopic
+  name: 'subscriber-sdk-simplified'
+  properties: {
+    lockDuration: 'PT5M'
+    maxDeliveryCount: 10
+  }
+}
+
+// user-inactive topic + subscriptions
+resource userInactiveTopic 'Microsoft.ServiceBus/namespaces/topics@2021-11-01' = {
+  parent: serviceBusNamespace
+  name: 'user-inactive'
+  properties: {}
+}
+resource userInactiveSubscriberSdkSimplified 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2021-11-01' = {
+  parent: userInactiveTopic
+  name: 'subscriber-sdk-simplified'
+  properties: {
+    lockDuration: 'PT5M'
+    maxDeliveryCount: 10
+  }
+}
 
 output acr_name string = containerRegistry.name
 output acr_login_server string = containerRegistry.properties.loginServer
