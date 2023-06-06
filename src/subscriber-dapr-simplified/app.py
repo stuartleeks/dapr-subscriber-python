@@ -38,7 +38,7 @@ async def on_task_created(notification: CloudEvent):
 # Can also specify pubsub_name and/or topic_name explicitly via the decorator:
 # notifications-pubsub-subscriber-2 specifies consumerID as task-notification-subscriber-2
 @consumer_app.consume(pubsub_name="notifications-pubsub-subscriber-2")
-def on_task_created(notification: CloudEvent):
+async def on_task_created(notification: CloudEvent):
     logger.info(f"🔔 new notification (subscriber-2): {notification.data}")
 
 

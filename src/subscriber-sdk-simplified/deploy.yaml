@@ -13,12 +13,17 @@ spec:
     metadata:
       labels:
         app: subscriber-sdk-simplified
+        azure.workload.identity/use: "true" 
     spec:
+      serviceAccountName: subscriber-sdk-simplified
       containers:
       - name: subscriber-sdk-simplified
         image: $REGISTRY_NAME/subscriber-sdk-simplified:latest
         env:
-        - name: DEFAULT_SUBSCRIPTION_NAME
-          value: subscriber-sdk-simplified
+        env:
+          - name: SERVICE_BUS_NAMESPACE
+            value: $SERVICE_BUS_NAMESPACE
+          - name: DEFAULT_SUBSCRIPTION_NAME
+            value: subscriber-sdk-simplified
         imagePullPolicy: Always
         # TODO - set env vars for connection string, topic name, subscription name

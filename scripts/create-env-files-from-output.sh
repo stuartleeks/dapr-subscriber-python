@@ -22,6 +22,17 @@ if [[ ${#service_bus_namespace_name} -eq 0 ]]; then
 fi
 service_bus_connection_string=$(az servicebus namespace authorization-rule keys list --resource-group $RESOURCE_GROUP --namespace-name $service_bus_namespace_name --name RootManageSharedAccessKey --query primaryConnectionString -o tsv)
 
+subscriber_sdk_simplified_client_id=$(jq -r '.subscriber_sdk_simplified_client_id' < "$output_file")
+if [[ ${#subscriber_sdk_simplified_client_id} -eq 0 ]]; then
+  echo 'ERROR: Missing output value subscriber_sdk_simplified_client_id' 1>&2
+  exit 6
+fi
+subscriber_sdk_direct_client_id=$(jq -r '.subscriber_sdk_direct_client_id' < "$output_file")
+if [[ ${#subscriber_sdk_direct_client_id} -eq 0 ]]; then
+  echo 'ERROR: Missing output value subscriber_sdk_direct_client_id' 1>&2
+  exit 6
+fi
+
 #create secret file with connection string for pubsub
 cat <<EOF > "$script_dir/../components.k8s/pubsub.secret.yaml"
 apiVersion: v1
@@ -68,3 +79,37 @@ cat <<EOF > "$script_dir/../src/subscriber-sdk-simplified/.env"
 SERVICE_BUS_CONNECTION_STRING="$service_bus_connection_string"
 EOF
 echo "CREATED: env file for SDK subscriber-sdk-simplified"
+
+
+service_account_namespace="default"
+service_account_name="subscriber-sdk-simplified"
+client_id=$subscriber_sdk_simplified_client_id
+cat <<EOF > "$script_dir/../components.k8s/serviceaccount-${service_account_name}.secret.yaml"
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    azure.workload.identity/client-id: ${client_id}
+  labels:
+    azure.workload.identity/use: "true"
+  name: ${service_account_name}
+  namespace: ${service_account_namespace}
+EOF
+echo "CREATED: k8s service account file for $service_account_name"
+
+
+service_account_namespace="default"
+service_account_name="subscriber-sdk-direct"
+client_id=$subscriber_sdk_direct_client_id
+cat <<EOF > "$script_dir/../components.k8s/serviceaccount-${service_account_name}.secret.yaml"
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    azure.workload.identity/client-id: ${client_id}
+  labels:
+    azure.workload.identity/use: "true"
+  name: ${service_account_name}
+  namespace: ${service_account_namespace}
+EOF
+echo "CREATED: k8s service account file for $service_account_name"
