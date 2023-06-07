@@ -32,3 +32,7 @@ build-images:
 # deploy subscribers to Kubernetes components (useful if you want to deploy updates to the services)
 deploy-to-k8s:
 	./scripts/deploy-to-k8s.sh
+
+# Un-deploy subscribers to Kubernetes components)
+undeploy-from-k8s:
+	./scripts/undeploy-from-k8s.sh
