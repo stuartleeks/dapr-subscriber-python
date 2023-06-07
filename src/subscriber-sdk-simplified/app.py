@@ -18,16 +18,15 @@ logging.getLogger("azure.servicebus._pyamqp.aio").setLevel(logging.WARNING)
 logging.getLogger("PubSub.ConsumerApp").setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+
 async def simulate_long_running(id: str):
     for i in range(0, 5):
-        logger.info(
-            f"💤 [{id}] sleeping to simulate long-running-work (i={i})...")
+        logger.info(f"💤 [{id}] sleeping to simulate long-running-work (i={i})...")
         await asyncio.sleep(2)
     logger.info("✅ [{entity_id}] Done sleeping")
 
 
 consumer_app = ConsumerApp()
-
 
 
 # @consumer_app.consume
@@ -37,12 +36,14 @@ consumer_app = ConsumerApp()
 #     # await simulate_long_running(entity_id)
 #     return ConsumerResult.SUCCESS
 
+
 # Or we can consume strongly typed events:
 @consumer_app.consume
 async def on_task_created(state_changed_event: models.TaskCreatedStateChangeEvent):
     logger.info(f"🔔 new task-created event: {state_changed_event}")
     # await simulate_long_running(state_changed_event.entity_id)
     return ConsumerResult.SUCCESS
+
 
 @consumer_app.consume
 async def on_task_updated(state_changed_event: models.TaskUpdatedStateChangeEvent):
@@ -64,7 +65,7 @@ async def on_user_created(state_changed_event: models.UserCreatedStateChangeEven
 #     message_id = notification.data["id"]
 #     print(f"🔔 new notification (subscriber-2): id={message_id}")
 
- 
+
 asyncio.run(consumer_app.run())
 
 # for sc in StateChangeEventBase.get_event_classes():

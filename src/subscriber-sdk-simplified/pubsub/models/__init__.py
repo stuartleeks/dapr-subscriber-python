@@ -1,11 +1,14 @@
-
 from pubsub import StateChangeEventBase
 
 
 class TaskStateChangeEventBase(StateChangeEventBase):
     """TaskStateChangeEvent is a base type for task state change events"""
 
-    def __init__(self, new_state: str, entity_id: str,):
+    def __init__(
+        self,
+        new_state: str,
+        entity_id: str,
+    ):
         super().__init__(entity_type="task", entity_id=entity_id, new_state=new_state)
 
     def __repr__(self) -> str:
@@ -36,7 +39,6 @@ class TaskUpdatedStateChangeEvent(TaskStateChangeEventBase):
 
     def __repr__(self) -> str:
         return f"TaskUpdatedStateChangeEvent(entity_id={self._entity_id})"
-
 
 
 class UserCreatedStateChangeEvent(StateChangeEventBase):

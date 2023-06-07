@@ -36,3 +36,6 @@ deploy-to-k8s:
 # Un-deploy subscribers to Kubernetes components)
 undeploy-from-k8s:
 	./scripts/undeploy-from-k8s.sh
+
+py-format:
+	black src

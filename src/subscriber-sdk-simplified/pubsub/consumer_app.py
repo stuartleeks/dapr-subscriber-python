@@ -2,6 +2,7 @@ import asyncio
 from enum import Enum
 import functools
 import inspect
+import re
 import jsons
 import logging
 import os
@@ -16,12 +17,12 @@ from dotenv import load_dotenv
 # TODO - refactor config storage/handling
 load_dotenv()
 
-CONNECTION_STR = os.environ.get('SERVICE_BUS_CONNECTION_STRING')
-AZURE_CLIENT_ID = os.getenv('AZURE_CLIENT_ID', '')
-AZURE_TENANT_ID = os.getenv('AZURE_TENANT_ID', '')
-AZURE_AUTHORITY_HOST = os.getenv('AZURE_AUTHORITY_HOST', '')
-AZURE_FEDERATED_TOKEN_FILE = os.getenv('AZURE_FEDERATED_TOKEN_FILE', '')
-SERVICE_BUS_NAMESPACE = os.getenv('SERVICE_BUS_NAMESPACE', '')
+CONNECTION_STR = os.environ.get("SERVICE_BUS_CONNECTION_STRING")
+AZURE_CLIENT_ID = os.getenv("AZURE_CLIENT_ID", "")
+AZURE_TENANT_ID = os.getenv("AZURE_TENANT_ID", "")
+AZURE_AUTHORITY_HOST = os.getenv("AZURE_AUTHORITY_HOST", "")
+AZURE_FEDERATED_TOKEN_FILE = os.getenv("AZURE_FEDERATED_TOKEN_FILE", "")
+SERVICE_BUS_NAMESPACE = os.getenv("SERVICE_BUS_NAMESPACE", "")
 
 
 class ConsumerResult(Enum):
@@ -39,6 +40,7 @@ class ConsumerResult(Enum):
 
 class StateChangeEventBase:
     """StateChangeEventBase is the base type for state change events"""
+
     _entity_type: str
     _new_state: str
     _entity_id: str
@@ -65,16 +67,14 @@ class StateChangeEventBase:
 
     def get_event_classes():
         event_classes = []
-        StateChangeEventBase._append_event_classes_for_type(
-            event_classes, StateChangeEventBase)
+        StateChangeEventBase._append_event_classes_for_type(event_classes, StateChangeEventBase)
         return event_classes
 
     def _append_event_classes_for_type(event_classes, type):
         for event_class in type.__subclasses__():
             if not event_class.__name__.endswith("Base"):
                 event_classes.append(event_class)
-            StateChangeEventBase._append_event_classes_for_type(
-                event_classes, event_class)
+            StateChangeEventBase._append_event_classes_for_type(event_classes, event_class)
 
 
 class Subscription:
@@ -93,7 +93,7 @@ class Subscription:
         func_name: str,
         max_message_count: Optional[int] = None,
         max_wait_time: Optional[int] = None,
-        max_lock_renewal_duration: Optional[int] = None
+        max_lock_renewal_duration: Optional[int] = None,
     ):
         self.topic = topic
         self.subscription_name = subscription_name
@@ -106,34 +106,39 @@ class Subscription:
 
 class ConsumerApp:
     """ConsumerApp is a helper for simplifying the consumption of messages from a Service Bus topic/subscription"""
+
     subscriptions: list[Subscription]
 
     def __init__(
-            self,
-            default_subscription_name: str = None,
-            max_message_count: int = 10,
-            max_wait_time: int = 30,
-            max_lock_renewal_duration: int = 5*60
+        self,
+        default_subscription_name: str = None,
+        max_message_count: int = 10,
+        max_wait_time: int = 30,
+        max_lock_renewal_duration: int = 5 * 60,
     ):
         self.logger = logging.getLogger(__name__)
         self.logger.info("SubscriberApp initialized")
         self.subscriptions = []
         if not default_subscription_name:
-            default_subscription_name = os.environ.get(
-                "DEFAULT_SUBSCRIPTION_NAME")
+            default_subscription_name = os.environ.get("DEFAULT_SUBSCRIPTION_NAME")
         if not default_subscription_name:
-            raise Exception(
-                "default_subscription_name must be provided or set in env var DEFAULT_SUBSCRIPTION_NAME")
+            raise Exception("default_subscription_name must be provided or set in env var DEFAULT_SUBSCRIPTION_NAME")
         self.default_subscription_name = default_subscription_name
         self.max_message_count = max_message_count
         self.max_wait_time = max_wait_time
         self.max_lock_renewal_duration = max_lock_renewal_duration
+        self._init_event_classes()
 
+    def _init_event_classes(self):
         event_classes = StateChangeEventBase.get_event_classes()
         # build a map of event types to converters
         self._payload_type_converters = {
             # note the event_class=event_class to capture the current value of event_class on each iteration
-            event_class: lambda msg_dict, event_class=event_class: event_class.from_dict(msg_dict) for event_class in event_classes
+            event_class: lambda msg_dict, event_class=event_class: event_class.from_dict(msg_dict)
+            for event_class in event_classes
+        }
+        self._topic_to_event_class_map = {
+            ConsumerApp._get_topic_name_from_event_class(event_class): event_class for event_class in event_classes
         }
 
         for event_class in event_classes:
@@ -147,41 +152,46 @@ class ConsumerApp:
     def _get_topic_name_from_method(func):
         function_name = func.__name__
         if not function_name.startswith("on_"):
-            raise Exception(
-                f"Function name must be in the form on_<entity-name>_<event-name>")
+            raise Exception(f"Function name must be in the form on_<entity-name>_<event-name>")
         parts = function_name.split("_")
         if len(parts) < 3:
-            raise Exception(
-                f"Function name must be in the form on_<entity-name>_<event-name>")
+            raise Exception(f"Function name must be in the form on_<entity-name>_<event-name>")
         topic_name = f"{parts[1]}-{parts[2]}"
         return topic_name
 
-    def _get_event_class_name_from_method(func):
-        function_name = func.__name__
-        if not function_name.startswith("on_"):
-            raise Exception(
-                f"Function name must be in the form on_<entity-name>_<event-name>")
-        parts = function_name.split("_")
-        if len(parts) < 3:
-            raise Exception(
-                f"Function name must be in the form on_<entity-name>_<event-name>")
-        topic_name = f"{parts[1]}-{parts[2]}"
-        return topic_name
+    def _get_event_class_from_method(self, func):
+        topic_name = ConsumerApp._get_topic_name_from_method(func)
+        return self._topic_to_event_class_map[topic_name]
+
+    def _get_topic_name_from_event_class(event_class):
+        event_class_name = event_class.__name__
+        if not event_class_name.endswith("StateChangeEvent"):
+            raise Exception(f"Event class name must end with StateChangeEvent")
+
+        topic_name = event_class_name.replace("StateChangeEvent", "")
+
+        return ConsumerApp._pascal_to_kebab_case(topic_name)
+
+    def _pascal_to_kebab_case(s):
+        # explain regex:
+        # (?<!^) - negative lookbehind, don't match the start of the string
+        # (?=[A-Z]) - positive lookahead, match any uppercase letter
+        # so this matches any uppercase letter that is not at the start of the string
+        # and inserts a dash before it
+        return re.sub(r"(?<!^)(?=[A-Z])", "-", s).lower()
 
     def _get_payload_converter_from_method(self, func):
         argspec = inspect.getfullargspec(func)
 
         # For simplicity currently, limit to a single argument that is the notification payload
         if len(argspec.args) != 1:
-            raise Exception(
-                "Function must have exactly one argument (the notification)")
+            raise Exception("Function must have exactly one argument (the notification)")
 
         arg0_annotation = argspec.annotations.get(argspec.args[0], None)
         if arg0_annotation is None:
             # default to dict for now
             # TODO - use func name to determine default type
-            self.logger.debug(
-                "No event payload annotation found, defaulting to dict")
+            self.logger.debug("No event payload annotation found, defaulting to dict")
             arg0_annotation = dict
 
         if arg0_annotation == dict:
@@ -189,8 +199,7 @@ class ConsumerApp:
             self.logger.debug("Using no-op converter for dict payload")
             return lambda msg_dict: msg_dict
 
-        self.logger.debug(
-            f"Using converter for payload type: {arg0_annotation}")
+        self.logger.debug(f"Using converter for payload type: {arg0_annotation}")
         converter = self._payload_type_converters.get(arg0_annotation, None)
         if converter is None:
             raise Exception(f"Unsupported payload type: {arg0_annotation}")
@@ -205,22 +214,22 @@ class ConsumerApp:
         subscription_name: Optional[str] = None,
         max_message_count: Optional[int] = None,
         max_wait_time: Optional[int] = None,
-        max_lock_renewal_duration: Optional[int] = None
+        max_lock_renewal_duration: Optional[int] = None,
     ):
         """Decorator for consuming messages from a Service Bus topic/subscription
 
         By default, the topic and subscription names are derived from the function name.
         For this, the function name should be in the for on_<entity-name>_<event-name>, e.g. on_task_created.
 
-        Alternatively, the topic and subscription names can be provided as arguments to the decorator."""
+        Alternatively, the topic and subscription names can be provided as arguments to the decorator.
+        """
 
         @functools.wraps(func)
         def decorator(func):
             nonlocal subscription_name
             nonlocal topic_name
 
-            notification_type = ConsumerApp._get_topic_name_from_method(
-                func)
+            notification_type = ConsumerApp._get_topic_name_from_method(func)
 
             if subscription_name is None:
                 subscription_name = self.default_subscription_name
@@ -228,14 +237,13 @@ class ConsumerApp:
 
             if topic_name is None:
                 topic_name = notification_type
-                self.logger.debug(
-                    f"topic_name not set, using topic_name from function name: {topic_name}")
+                self.logger.debug(f"topic_name not set, using topic_name from function name: {topic_name}")
 
             self.logger.info(
-                f"🔎 Found consumer {func.__qualname__} (topic={topic_name}, subscription={subscription_name}")
+                f"🔎 Found consumer {func.__qualname__} (topic={topic_name}, subscription={subscription_name}"
+            )
 
-            payload_converter = self._get_payload_converter_from_method(
-                func)
+            payload_converter = self._get_payload_converter_from_method(func)
 
             async def wrap_handler(receiver: ServiceBusReceiver, msg: ServiceBusReceivedMessage):
                 try:
@@ -248,21 +256,17 @@ class ConsumerApp:
 
                     # Handle the response
                     if result == ConsumerResult.RETRY:
-                        self.logger.info(
-                            f"Handler returned RETRY ({msg.message_id}) - abandoning")
+                        self.logger.info(f"Handler returned RETRY ({msg.message_id}) - abandoning")
                         await receiver.abandon_message(msg)
                     elif result == ConsumerResult.DROP:
-                        self.logger.info(
-                            f"Handler returned DROP ({msg.message_id}) - deadlettering")
+                        self.logger.info(f"Handler returned DROP ({msg.message_id}) - deadlettering")
                         await receiver.dead_letter_message(msg, reason="dropped by subscriber")
                     else:
                         # Other return values are treated as success
-                        self.logger.info(
-                            f"Handler returned successfully ({msg.message_id}) - completing")
+                        self.logger.info(f"Handler returned successfully ({msg.message_id}) - completing")
                         await receiver.complete_message(msg)
                 except Exception as e:
-                    self.logger.info(
-                        f"Error processing message ({msg.message_id}) - abandoning: {e}")
+                    self.logger.info(f"Error processing message ({msg.message_id}) - abandoning: {e}")
                     await receiver.abandon_message(msg)
 
             func_name = func.__qualname__
@@ -274,7 +278,7 @@ class ConsumerApp:
                     func_name=func_name,
                     max_message_count=max_message_count,
                     max_wait_time=max_wait_time,
-                    max_lock_renewal_duration=max_lock_renewal_duration
+                    max_lock_renewal_duration=max_lock_renewal_duration,
                 )
             )
             return func
@@ -289,50 +293,47 @@ class ConsumerApp:
     async def _process_subscription(self, servicebus_client: ServiceBusClient, subscription: Subscription):
         receiver = servicebus_client.get_subscription_receiver(
             topic_name=subscription.topic,
-            subscription_name=subscription.subscription_name
+            subscription_name=subscription.subscription_name,
         )
         max_message_count = subscription.max_message_count or self.max_message_count
         max_wait_time = subscription.max_wait_time or self.max_wait_time
         max_lock_renewal_duration = subscription.max_lock_renewal_duration or self.max_lock_renewal_duration
         async with receiver:
             # AutoLockRenewer performs message lock renewal (for long message processing)
-            renewer = AutoLockRenewer(
-                max_lock_renewal_duration=max_lock_renewal_duration)
+            renewer = AutoLockRenewer(max_lock_renewal_duration=max_lock_renewal_duration)
 
             self.logger.info(
-                f"👂 Starting message receiver for {subscription.func_name} (topic={subscription.topic}, subscription={subscription.subscription_name}...")
+                f"👂 Starting message receiver for {subscription.func_name} (topic={subscription.topic}, subscription={subscription.subscription_name}..."
+            )
             while True:
                 # TODO: Add back-off logic when no messages?
-                received_msgs = await receiver.receive_messages(max_message_count=max_message_count, max_wait_time=max_wait_time)
+                received_msgs = await receiver.receive_messages(
+                    max_message_count=max_message_count, max_wait_time=max_wait_time
+                )
 
                 if len(received_msgs) == 0:
-                    self.logger.debug(
-                        f"No messages received(topic={subscription.topic})")
+                    self.logger.debug(f"No messages received(topic={subscription.topic})")
                     continue
 
-                self.logger.info(
-                    f"📦 Batch received, size =  {len(received_msgs)}")
+                self.logger.info(f"📦 Batch received, size =  {len(received_msgs)}")
                 start = timer()
 
                 # Set up message renewal for the batch
                 for msg in received_msgs:
-                    self.logger.debug(
-                        f"Received message {msg.message_id}, registering for renewal")
+                    self.logger.debug(f"Received message {msg.message_id}, registering for renewal")
                     renewer.register(receiver, msg)
 
                 # process messages in parallel
                 await asyncio.gather(*[subscription.handler(receiver, msg) for msg in received_msgs])
                 end = timer()
                 duration = end - start
-                self.logger.info(
-                    f"📦 Batch done, size={len(received_msgs)}, duration={duration}s")
+                self.logger.info(f"📦 Batch done, size={len(received_msgs)}, duration={duration}s")
 
     async def run(self):
         """Run the consumer app, i.e. begin processing messages from the Service Bus subscriptions"""
 
         if len(self.subscriptions) == 0:
-            raise Exception(
-                "No consumers registered - ensure you have added @consumer decorators to your handlers")
+            raise Exception("No consumers registered - ensure you have added @consumer decorators to your handlers")
 
         workload_identity_credential = None
         servicebus_client = None
@@ -341,18 +342,26 @@ class ConsumerApp:
         if AZURE_CLIENT_ID and AZURE_TENANT_ID and AZURE_AUTHORITY_HOST and AZURE_FEDERATED_TOKEN_FILE:
             self.logger.info("Using workload identity credentials")
             workload_identity_credential = WorkloadIdentityCredential(
-                client_id=AZURE_CLIENT_ID, tenant_id=AZURE_TENANT_ID, token_file_path=AZURE_FEDERATED_TOKEN_FILE)
+                client_id=AZURE_CLIENT_ID,
+                tenant_id=AZURE_TENANT_ID,
+                token_file_path=AZURE_FEDERATED_TOKEN_FILE,
+            )
             servicebus_client = ServiceBusClient(
-                fully_qualified_namespace=SERVICE_BUS_NAMESPACE, credential=workload_identity_credential)
+                fully_qualified_namespace=SERVICE_BUS_NAMESPACE,
+                credential=workload_identity_credential,
+            )
         else:
-            self.logger.info(
-                "No workload identity credentials found, using connection string")
-            servicebus_client = ServiceBusClient.from_connection_string(
-                conn_str=CONNECTION_STR)
+            self.logger.info("No workload identity credentials found, using connection string")
+            servicebus_client = ServiceBusClient.from_connection_string(conn_str=CONNECTION_STR)
 
         try:
             async with servicebus_client:
-                await asyncio.gather(*[self._process_subscription(servicebus_client, subscription) for subscription in self.subscriptions])
+                await asyncio.gather(
+                    *[
+                        self._process_subscription(servicebus_client, subscription)
+                        for subscription in self.subscriptions
+                    ]
+                )
 
         finally:
             if workload_identity_credential:

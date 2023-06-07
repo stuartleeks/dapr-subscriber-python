@@ -1,4 +1,4 @@
-from .ConsumerApp import ConsumerApp as ConsumerApp
-from .ConsumerApp import ConsumerResult as ConsumerResult
-from .ConsumerApp import StateChangeEventBase as StateChangeEventBase
+from .consumer_app import ConsumerApp as ConsumerApp
+from .consumer_app import ConsumerResult as ConsumerResult
+from .consumer_app import StateChangeEventBase as StateChangeEventBase
 from . import models as models
