@@ -32,7 +32,7 @@ class ConsumerResult(Enum):
 
     RETRY = 1
     """The message was not processed successfully and should be marked as abandoned and retried"""
-    
+
     DROP = 2
     """The message was not processed successfully but is invalid and should be sent to the dead-letter queue"""
 
@@ -83,12 +83,14 @@ class Subscription:
     handler: callable
     max_message_count: Optional[int]
     max_wait_time: Optional[int]
+    func_name: str
 
     def __init__(
         self,
         topic: str,
         subscription_name,
         handler: callable,
+        func_name: str,
         max_message_count: Optional[int] = None,
         max_wait_time: Optional[int] = None,
         max_lock_renewal_duration: Optional[int] = None
@@ -96,6 +98,7 @@ class Subscription:
         self.topic = topic
         self.subscription_name = subscription_name
         self.handler = handler
+        self.func_name = func_name
         self.max_message_count = max_message_count
         self.max_wait_time = max_wait_time
         self.max_lock_renewal_duration = max_lock_renewal_duration
@@ -205,10 +208,10 @@ class ConsumerApp:
         max_lock_renewal_duration: Optional[int] = None
     ):
         """Decorator for consuming messages from a Service Bus topic/subscription
-        
+
         By default, the topic and subscription names are derived from the function name.
         For this, the function name should be in the for on_<entity-name>_<event-name>, e.g. on_task_created.
-        
+
         Alternatively, the topic and subscription names can be provided as arguments to the decorator."""
 
         @functools.wraps(func)
@@ -229,7 +232,7 @@ class ConsumerApp:
                     f"topic_name not set, using topic_name from function name: {topic_name}")
 
             self.logger.info(
-                f"👂 Adding subscription: {topic_name}/{subscription_name}")
+                f"🔎 Found consumer {func.__qualname__} (topic={topic_name}, subscription={subscription_name}")
 
             payload_converter = self._get_payload_converter_from_method(
                 func)
@@ -262,14 +265,16 @@ class ConsumerApp:
                         f"Error processing message ({msg.message_id}) - abandoning: {e}")
                     await receiver.abandon_message(msg)
 
+            func_name = func.__qualname__
             self.subscriptions.append(
                 Subscription(
-                    topic_name,
-                    subscription_name,
-                    wrap_handler,
-                    max_message_count,
-                    max_wait_time,
-                    max_lock_renewal_duration
+                    topic=topic_name,
+                    subscription_name=subscription_name,
+                    handler=wrap_handler,
+                    func_name=func_name,
+                    max_message_count=max_message_count,
+                    max_wait_time=max_wait_time,
+                    max_lock_renewal_duration=max_lock_renewal_duration
                 )
             )
             return func
@@ -295,10 +300,15 @@ class ConsumerApp:
                 max_lock_renewal_duration=max_lock_renewal_duration)
 
             self.logger.info(
-                f"Starting message receiver (topic={subscription.topic})...")
+                f"👂 Starting message receiver for {subscription.func_name} (topic={subscription.topic}, subscription={subscription.subscription_name}...")
             while True:
                 # TODO: Add back-off logic when no messages?
                 received_msgs = await receiver.receive_messages(max_message_count=max_message_count, max_wait_time=max_wait_time)
+
+                if len(received_msgs) == 0:
+                    self.logger.debug(
+                        f"No messages received(topic={subscription.topic})")
+                    continue
 
                 self.logger.info(
                     f"📦 Batch received, size =  {len(received_msgs)}")
