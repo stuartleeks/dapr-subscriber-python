@@ -35,7 +35,8 @@
 			"extensions": [
 				"humao.rest-client",
 				"ms-python.python",
-				"ms-azuretools.vscode-bicep"
+				"ms-azuretools.vscode-bicep",
+				"ms-python.black-formatter"
 			]
 		}
 	}
