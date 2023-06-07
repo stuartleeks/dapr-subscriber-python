@@ -25,9 +25,16 @@ SERVICE_BUS_NAMESPACE = os.getenv('SERVICE_BUS_NAMESPACE', '')
 
 
 class ConsumerResult(Enum):
+    """ConsumerResult is used to indicate the result when a consumer processes a message"""
+
     SUCCESS = 0
+    """The message was processed successfully and should be marked as completed"""
+
     RETRY = 1
+    """The message was not processed successfully and should be marked as abandoned and retried"""
+    
     DROP = 2
+    """The message was not processed successfully but is invalid and should be sent to the dead-letter queue"""
 
 
 class StateChangeEventBase:
@@ -191,12 +198,18 @@ class ConsumerApp:
         self,
         func=None,
         *,
-        subscription_name: Optional[str] = None,
         topic_name: Optional[str] = None,
+        subscription_name: Optional[str] = None,
         max_message_count: Optional[int] = None,
         max_wait_time: Optional[int] = None,
         max_lock_renewal_duration: Optional[int] = None
     ):
+        """Decorator for consuming messages from a Service Bus topic/subscription
+        
+        By default, the topic and subscription names are derived from the function name.
+        For this, the function name should be in the for on_<entity-name>_<event-name>, e.g. on_task_created.
+        
+        Alternatively, the topic and subscription names can be provided as arguments to the decorator."""
 
         @functools.wraps(func)
         def decorator(func):
@@ -268,7 +281,7 @@ class ConsumerApp:
             # We are called as a simple decorator
             return decorator(func)
 
-    async def process_subscription(self, servicebus_client: ServiceBusClient, subscription: Subscription):
+    async def _process_subscription(self, servicebus_client: ServiceBusClient, subscription: Subscription):
         receiver = servicebus_client.get_subscription_receiver(
             topic_name=subscription.topic,
             subscription_name=subscription.subscription_name
@@ -305,6 +318,7 @@ class ConsumerApp:
                     f"📦 Batch done, size={len(received_msgs)}, duration={duration}s")
 
     async def run(self):
+        """Run the consumer app, i.e. begin processing messages from the Service Bus subscriptions"""
 
         if len(self.subscriptions) == 0:
             raise Exception(
@@ -328,7 +342,7 @@ class ConsumerApp:
 
         try:
             async with servicebus_client:
-                await asyncio.gather(*[self.process_subscription(servicebus_client, subscription) for subscription in self.subscriptions])
+                await asyncio.gather(*[self._process_subscription(servicebus_client, subscription) for subscription in self.subscriptions])
 
         finally:
             if workload_identity_credential:
