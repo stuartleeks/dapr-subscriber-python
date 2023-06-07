@@ -2,7 +2,7 @@ import logging
 import asyncio
 
 
-from PubSub.ConsumerApp import ConsumerApp, ConsumerResult, StateChangeEvent
+from PubSub.ConsumerApp import ConsumerApp, ConsumerResult, StateChangeEventBase, TaskCreatedStateChangeEvent, TaskUpdatedStateChangeEvent, UserCreatedStateChangeEvent
 
 #
 # This application demonstrates how the Service Bus SDK API could be abstracted to
@@ -25,7 +25,6 @@ async def simulate_long_running(id: str):
 
 consumer_app = ConsumerApp()
 
-# We can consume raw cloud events:
 
 
 @consumer_app.consume
@@ -37,20 +36,20 @@ async def on_task_created(notification: dict):
 
 # Or we can consume strongly typed events:
 # @consumer_app.consume
-# async def on_task_created(state_changed_event: StateChangeEvent):
+# async def on_task_created(state_changed_event: TaskCreatedStateChangeEvent):
 #     logger.info(f"🔔 new task-created event: {state_changed_event}")
 #     # await simulate_long_running(state_changed_event.entity_id)
 #     return ConsumerResult.SUCCESS
 
 @consumer_app.consume
-async def on_task_updated(state_changed_event: StateChangeEvent):
+async def on_task_updated(state_changed_event: TaskUpdatedStateChangeEvent):
     logger.info(f"🔔 new task-updated event: {state_changed_event}")
     # await simulate_long_running(state_changed_event.entity_id)
     return ConsumerResult.SUCCESS
 
 
 @consumer_app.consume
-async def on_user_created(state_changed_event: StateChangeEvent):
+async def on_user_created(state_changed_event: UserCreatedStateChangeEvent):
     logger.info(f"🔔 new user-created event: {state_changed_event}")
     # await simulate_long_running(state_changed_event.entity_id)
     return ConsumerResult.SUCCESS

@@ -31,32 +31,95 @@ class ConsumerResult(Enum):
     RETRY = 1
     DROP = 2
 
-class StateChangeEvent:
-    """StateChangeEvent is the base type for state change events"""
-    entity_type: str
-    entity_id: str
-    new_state: str
+
+class StateChangeEventBase:
+    """StateChangeEventBase is the base type for state change events"""
+    _entity_type: str
+    _new_state: str
+    _entity_id: str
 
     def __init__(self, entity_type: str, entity_id: str, new_state: str):
-        self.entity_type = entity_type
-        self.entity_id = entity_id
-        self.new_state = new_state
-
-    def from_dict(data: dict):
-        entity_type = data["entity_type"]
-        entity_id = data["entity_id"]
-        new_state = data["new_state"]
-        return StateChangeEvent(entity_type, entity_id, new_state)
+        self._entity_type = entity_type
+        self._new_state = new_state
+        self._entity_id = entity_id
 
     def __repr__(self) -> str:
-        return f"StateChangeEvent(entity_type={self.entity_type}, entity_id={self.entity_id}, new_state={self.new_state})"
+        return f"StateChangeEventBase(entity_type={self._entity_type}, new_state={self._new_state}, entity_id={self._entity_id})"
+
+    @property
+    def entity_type(self) -> str:
+        return self._entity_type
+
+    @property
+    def new_state(self) -> str:
+        return self._new_state
+
+    @property
+    def entity_id(self) -> str:
+        return self._entity_id
+
+    def get_event_classes():
+        event_classes = []
+        StateChangeEventBase._append_event_classes_for_type(
+            event_classes, StateChangeEventBase)
+        return event_classes
+
+    def _append_event_classes_for_type(event_classes, type):
+        for event_class in type.__subclasses__():
+            if not event_class.__name__.endswith("Base"):
+                event_classes.append(event_class)
+            StateChangeEventBase._append_event_classes_for_type(
+                event_classes, event_class)
 
 
-_payload_type_converters = {
-    dict: lambda msg_dict: msg_dict,
-    StateChangeEvent: lambda msg_dict: StateChangeEvent.from_dict(
-        msg_dict)
-}
+
+class TaskStateChangeEventBase(StateChangeEventBase):
+    """TaskStateChangeEvent is a base type for task state change events"""
+
+    def __init__(self, new_state: str, entity_id: str,):
+        super().__init__(entity_type="task", entity_id=entity_id, new_state=new_state)
+
+    def __repr__(self) -> str:
+        return f"TaskStateChangeEventBase(new_state={self._new_state}, entity_id={self._entity_id})"
+
+
+class TaskCreatedStateChangeEvent(TaskStateChangeEventBase):
+    """TaskCreatedStateChangeEvent is a type for task created events"""
+
+    def __init__(self, entity_id: str):
+        super().__init__(new_state="created", entity_id=entity_id)
+
+    def from_dict(msg_dict: dict):
+        return TaskCreatedStateChangeEvent(msg_dict["entity_id"])
+
+    def __repr__(self) -> str:
+        return f"TaskCreatedStateChangeEvent(entity_id={self._entity_id})"
+
+
+class TaskUpdatedStateChangeEvent(TaskStateChangeEventBase):
+    """TaskUpdatedStateChangeEvent is a type for task updated events"""
+
+    def __init__(self, entity_id: str):
+        super().__init__(new_state="updated", entity_id=entity_id)
+
+    def from_dict(msg_dict: dict):
+        return TaskUpdatedStateChangeEvent(msg_dict["entity_id"])
+
+    def __repr__(self) -> str:
+        return f"TaskUpdatedStateChangeEvent(entity_id={self._entity_id})"
+
+
+class UserCreatedStateChangeEvent(StateChangeEventBase):
+    """UserCreatedStateChangeEvent is a type for user created events"""
+
+    def __init__(self, entity_id: str):
+        super().__init__(entity_type="user", new_state="created", entity_id=entity_id)
+
+    def from_dict(msg_dict: dict):
+        return UserCreatedStateChangeEvent(msg_dict["entity_id"])
+
+    def __repr__(self) -> str:
+        return f"UserCreatedStateChangeEvent(entity_id={self._entity_id})"
 
 
 class Subscription:
@@ -98,13 +161,30 @@ class ConsumerApp:
         self.logger.info("SubscriberApp initialized")
         self.subscriptions = []
         if not default_subscription_name:
-            default_subscription_name = os.environ.get("DEFAULT_SUBSCRIPTION_NAME")
+            default_subscription_name = os.environ.get(
+                "DEFAULT_SUBSCRIPTION_NAME")
         if not default_subscription_name:
-            raise Exception("default_subscription_name must be provided or set in env var DEFAULT_SUBSCRIPTION_NAME")
+            raise Exception(
+                "default_subscription_name must be provided or set in env var DEFAULT_SUBSCRIPTION_NAME")
         self.default_subscription_name = default_subscription_name
         self.max_message_count = max_message_count
         self.max_wait_time = max_wait_time
         self.max_lock_renewal_duration = max_lock_renewal_duration
+
+        event_classes = StateChangeEventBase.get_event_classes()
+        # build a map of event types to converters
+        self._payload_type_converters = {
+            # note the event_class=event_class to capture the current value of event_class on each iteration
+            event_class: lambda msg_dict, event_class=event_class: event_class.from_dict(msg_dict) for event_class in event_classes
+        }
+
+        for event_class in event_classes:
+            self.logger.info(f"Found state event class: {event_class}")
+
+    #
+    # TODO - revist the conventions here
+    # e.g. should we allow on_task_in_progress which mapps to TaskInProgressState
+    #
 
     def _get_topic_name_from_method(func):
         function_name = func.__name__
@@ -128,10 +208,20 @@ class ConsumerApp:
 
         arg0_annotation = argspec.annotations.get(argspec.args[0], None)
         if arg0_annotation is None:
-            # default to state change event data type
-            return _payload_type_converters[StateChangeEvent]
+            # default to dict for now
+            # TODO - use func name to determine default type
+            self.logger.debug(
+                "No event payload annotation found, defaulting to dict")
+            arg0_annotation = dict
 
-        converter = _payload_type_converters.get(arg0_annotation, None)
+        if arg0_annotation == dict:
+            # no conversion needed
+            self.logger.debug("Using no-op converter for dict payload")
+            return lambda msg_dict: msg_dict
+
+        self.logger.debug(
+            f"Using converter for payload type: {arg0_annotation}")
+        converter = self._payload_type_converters.get(arg0_annotation, None)
         if converter is None:
             raise Exception(f"Unsupported payload type: {arg0_annotation}")
 
@@ -162,13 +252,13 @@ class ConsumerApp:
 
             if topic_name is None:
                 topic_name = notification_type
-                self.logger.info(
+                self.logger.debug(
                     f"topic_name not set, using topic_name from function name: {topic_name}")
 
             self.logger.info(
                 f"👂 Adding subscription: {topic_name}/{subscription_name}")
 
-            payload_converter = ConsumerApp._get_payload_converter_from_method(
+            payload_converter = self._get_payload_converter_from_method(
                 func)
 
             async def wrap_handler(receiver: ServiceBusReceiver, msg: ServiceBusReceivedMessage):
@@ -255,6 +345,11 @@ class ConsumerApp:
                     f"📦 Batch done, size={len(received_msgs)}, duration={duration}s")
 
     async def run(self):
+
+        if len(self.subscriptions) == 0:
+            raise Exception(
+                "No consumers registered - ensure you have added @consumer decorators to your handlers")
+
         workload_identity_credential = None
         servicebus_client = None
 
@@ -266,14 +361,15 @@ class ConsumerApp:
             servicebus_client = ServiceBusClient(
                 fully_qualified_namespace=SERVICE_BUS_NAMESPACE, credential=workload_identity_credential)
         else:
-            self.logger.info("No workload identity credentials found, using connection string")
+            self.logger.info(
+                "No workload identity credentials found, using connection string")
             servicebus_client = ServiceBusClient.from_connection_string(
                 conn_str=CONNECTION_STR)
 
         try:
             async with servicebus_client:
                 await asyncio.gather(*[self.process_subscription(servicebus_client, subscription) for subscription in self.subscriptions])
+
         finally:
             if workload_identity_credential:
                 await workload_identity_credential.close()
-

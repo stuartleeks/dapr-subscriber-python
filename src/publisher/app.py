@@ -56,7 +56,7 @@ else:
         conn_str=CONNECTION_STR)
 
 with servicebus_client:
-    print("Creating service bus receiver...", flush=True)
+    print("Creating service bus sender...", flush=True)
     sender = servicebus_client.get_topic_sender(
         topic_name=topic_name
     )
@@ -72,8 +72,6 @@ with servicebus_client:
             # TODO batch messages
             message = ServiceBusMessage(json.dumps({
                     "entity_id": id,
-                    "entity_type": "task",
-                    "new_state": "completed"
                 }))
             sender.send_messages(message)
             print(f"✅ Published message with id {id}")
