@@ -31,20 +31,6 @@ class ConsumerResult(Enum):
     RETRY = 1
     DROP = 2
 
-
-class CloudEvent:
-    datacontenttype: str
-    source: str
-    topic: str
-    pubsubname: str
-    data: dict
-    id: str
-    specversion: str
-    tracestate: str
-    type: str
-    traceid: str
-
-
 class StateChangeEvent:
     """StateChangeEvent is the base type for state change events"""
     entity_type: str
@@ -67,9 +53,9 @@ class StateChangeEvent:
 
 
 _payload_type_converters = {
-    CloudEvent: lambda cloudEvent: cloudEvent,
-    StateChangeEvent: lambda cloudEvent: StateChangeEvent.from_dict(
-        cloudEvent.data)
+    dict: lambda msg_dict: msg_dict,
+    StateChangeEvent: lambda msg_dict: StateChangeEvent.from_dict(
+        msg_dict)
 }
 
 
@@ -98,7 +84,7 @@ class Subscription:
 
 
 class ConsumerApp:
-    """ConsumerApp is a wrapper around a FastAPI app that provides a decorator for subscribing to pubsub events using Dapr"""
+    """ConsumerApp is a helper for simplifying the consumption of messages from a Service Bus topic/subscription"""
     subscriptions: list[Subscription]
 
     def __init__(
@@ -188,7 +174,7 @@ class ConsumerApp:
             async def wrap_handler(receiver: ServiceBusReceiver, msg: ServiceBusReceivedMessage):
                 try:
                     # Convert message to correct payload type
-                    parsed_message = jsons.loads(str(msg), CloudEvent)
+                    parsed_message = jsons.loads(str(msg), dict)
                     payload = payload_converter(parsed_message)
 
                     # Call the decorated function

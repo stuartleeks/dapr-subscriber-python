@@ -3,4 +3,3 @@ azure-identity
 aiohttp
 python-dotenv
 jsons
-azure-identity

@@ -18,17 +18,6 @@ fi
 echo "### Deploying components"
 kubectl apply -f "$script_dir/../components.k8s"
 
-
-echo "### Deploying subscriber-dapr-api"
-cat "$script_dir/../src/subscriber-dapr-api/deploy.yaml" \
-  | REGISTRY_NAME=$acr_login_server SERVICE_BUS_NAMESPACE=$service_bus_namespace_qualified_name envsubst \
-  | kubectl apply -f -
-
-echo "### Deploying subscriber-dapr-simplified"
-cat "$script_dir/../src/subscriber-dapr-simplified/deploy.yaml" \
-  | REGISTRY_NAME=$acr_login_server SERVICE_BUS_NAMESPACE=$service_bus_namespace_qualified_name envsubst \
-  | kubectl apply -f -
-
 echo "### Deploying subscriber-sdk-direct"
 cat "$script_dir/../src/subscriber-sdk-direct/deploy.yaml" \
   | REGISTRY_NAME=$acr_login_server SERVICE_BUS_NAMESPACE=$service_bus_namespace_qualified_name envsubst \

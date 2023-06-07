@@ -5,8 +5,6 @@ import os
 from azure.servicebus.aio import ServiceBusClient, AutoLockRenewer, ServiceBusReceiver
 from azure.servicebus import ServiceBusReceivedMessage
 from dotenv import load_dotenv
-# from azure.core.credentials import AccessToken
-# from msal import ConfidentialClientApplication
 from azure.identity.aio import WorkloadIdentityCredential
 
 #
@@ -30,26 +28,10 @@ SERVICE_BUS_NAMESPACE = os.getenv('SERVICE_BUS_NAMESPACE', '')
 TOPIC_NAME = "task-created"
 SUBSCRIPTION_NAME = "subscriber-sdk-direct"
 
-# This app uses cloud events because the messages publisher uses cloud events via Dapr
-# If not using Dapr, a simpler message format could be used
-
-
-class CloudEvent:
-    datacontenttype: str
-    source: str
-    topic: str
-    pubsubname: str
-    data: dict
-    id: str
-    specversion: str
-    tracestate: str
-    type: str
-    traceid: str
-
 async def wrap_handler(receiver: ServiceBusReceiver, handler, msg: ServiceBusReceivedMessage):
     try:
         # TODO - allow success/retry/drop to be returned from handler
-        parsed_message = jsons.loads(str(msg), CloudEvent)
+        parsed_message = jsons.loads(str(msg), dict)
         await handler(parsed_message)
         await receiver.complete_message(msg)
     except Exception as e:
@@ -102,9 +84,9 @@ async def process_messages(handler):
         if workload_identity_credential:
             await workload_identity_credential.close()
 
-async def on_task_notification(msg: CloudEvent):
-    entity_id = msg.data["entity_id"]
-    print(f"🔔 [{entity_id}] Received message: ", msg.data, flush=True)
+async def on_task_notification(msg):
+    entity_id = msg["entity_id"]
+    print(f"🔔 [{entity_id}] Received message: ", msg, flush=True)
     for i in range(0, 5):
         print(
             f"💤 [{entity_id}] sleeping to simulate long-running-work (i={i})...", flush=True)

@@ -33,42 +33,10 @@ if [[ ${#subscriber_sdk_direct_client_id} -eq 0 ]]; then
   exit 6
 fi
 
-#create secret file with connection string for pubsub
-cat <<EOF > "$script_dir/../components.k8s/pubsub.secret.yaml"
-apiVersion: v1
-data:
-  connectionString: $(echo -n "$service_bus_connection_string" | base64 -w 0)
-kind: Secret
-metadata:
-  name: servicebus-pubsub-secret
-  namespace: default
-type: Opaque
+cat <<EOF > "$script_dir/../src/publisher/.env"
+SERVICE_BUS_CONNECTION_STRING="$service_bus_connection_string"
 EOF
-echo "CREATED: k8s secret file"
-
-
-
-cat <<EOF > "$script_dir/../src/publisher/local.secret.json"
-{
-  "SERVICE_BUS_CONNECTION_STRING": "$service_bus_connection_string"
-}
-EOF
-echo "CREATED: local secret file for publisher"
-
-cat <<EOF > "$script_dir/../src/subscriber-dapr-api/local.secret.json"
-{
-  "SERVICE_BUS_CONNECTION_STRING": "$service_bus_connection_string"
-}
-EOF
-echo "CREATED: local secret file for subscriber-dapr-api"
-
-cat <<EOF > "$script_dir/../src/subscriber-dapr-simplified/local.secret.json"
-{
-  "SERVICE_BUS_CONNECTION_STRING": "$service_bus_connection_string"
-}
-EOF
-echo "CREATED: local secret file for subscriber-dapr-simplified"
-
+echo "CREATED: env file for publisher"
 
 cat <<EOF > "$script_dir/../src/subscriber-sdk-direct/.env"
 SERVICE_BUS_CONNECTION_STRING="$service_bus_connection_string"
@@ -80,6 +48,7 @@ SERVICE_BUS_CONNECTION_STRING="$service_bus_connection_string"
 EOF
 echo "CREATED: env file for SDK subscriber-sdk-simplified"
 
+mkdir -p "$script_dir/../components.k8s"
 
 service_account_namespace="default"
 service_account_name="subscriber-sdk-simplified"

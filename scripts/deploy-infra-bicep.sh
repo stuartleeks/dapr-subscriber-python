@@ -84,15 +84,3 @@ if [[ ${#aks_name} -eq 0 ]]; then
   echo 'ERROR: Missing output value aks_name' 1>&2
   exit 6
 fi
-
-dapr_installed=$(az k8s-extension list --resource-group $RESOURCE_GROUP --cluster-name $aks_name --cluster-type managedClusters --query "length([?name=='dapr'])" -o tsv)
-if [[ "$dapr_installed" == "1" ]]; then
-  echo "Dapr extension already installed"
-else
-  echo "Create Dapr extension for AKS cluster"
-  az k8s-extension create --cluster-type managedClusters \
-  --cluster-name $aks_name \
-  --resource-group $RESOURCE_GROUP \
-  --name dapr \
-  --extension-type Microsoft.Dapr
-fi

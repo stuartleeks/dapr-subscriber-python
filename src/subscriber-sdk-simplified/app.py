@@ -2,11 +2,11 @@ import logging
 import asyncio
 
 
-from PubSub.ConsumerApp import ConsumerApp, CloudEvent, ConsumerResult, StateChangeEvent
+from PubSub.ConsumerApp import ConsumerApp, ConsumerResult, StateChangeEvent
 
 #
-# This application demonstrates how the Dapr API could be abstracted to
-# provde a simplified dev experience for subscribing to pubsub events through
+# This application demonstrates how the Service Bus SDK API could be abstracted to
+# provde a simplified dev experience for subscribing to messages through
 # the use of helper code and conventions.
 #
 
@@ -28,19 +28,19 @@ consumer_app = ConsumerApp()
 # We can consume raw cloud events:
 
 
-# @consumer_app.consume
-# async def on_task_created(notification: CloudEvent):
-#     print("🔔 [{entity_id}] Received message: ", notification.data, flush=True)
-#     entity_id = notification.data["entity_id"]
-#     await simulate_long_running(entity_id)
-#     return ConsumerResult.SUCCESS
+@consumer_app.consume
+async def on_task_created(notification: dict):
+    entity_id = notification["entity_id"]
+    print("🔔 [{entity_id}] Received message: ", notification, flush=True)
+    # await simulate_long_running(entity_id)
+    return ConsumerResult.SUCCESS
 
 # Or we can consume strongly typed events:
-@consumer_app.consume
-async def on_task_created(state_changed_event: StateChangeEvent):
-    logger.info(f"🔔 new task-created event: {state_changed_event}")
-    # await simulate_long_running(state_changed_event.entity_id)
-    return ConsumerResult.SUCCESS
+# @consumer_app.consume
+# async def on_task_created(state_changed_event: StateChangeEvent):
+#     logger.info(f"🔔 new task-created event: {state_changed_event}")
+#     # await simulate_long_running(state_changed_event.entity_id)
+#     return ConsumerResult.SUCCESS
 
 @consumer_app.consume
 async def on_task_updated(state_changed_event: StateChangeEvent):
