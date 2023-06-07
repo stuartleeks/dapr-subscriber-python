@@ -23,8 +23,6 @@ AZURE_AUTHORITY_HOST = os.getenv('AZURE_AUTHORITY_HOST', '')
 AZURE_FEDERATED_TOKEN_FILE = os.getenv('AZURE_FEDERATED_TOKEN_FILE', '')
 SERVICE_BUS_NAMESPACE = os.getenv('SERVICE_BUS_NAMESPACE', '')
 
-# TODO - split types into separate file(s)
-
 
 class ConsumerResult(Enum):
     SUCCESS = 0
@@ -70,56 +68,6 @@ class StateChangeEventBase:
                 event_classes.append(event_class)
             StateChangeEventBase._append_event_classes_for_type(
                 event_classes, event_class)
-
-
-
-class TaskStateChangeEventBase(StateChangeEventBase):
-    """TaskStateChangeEvent is a base type for task state change events"""
-
-    def __init__(self, new_state: str, entity_id: str,):
-        super().__init__(entity_type="task", entity_id=entity_id, new_state=new_state)
-
-    def __repr__(self) -> str:
-        return f"TaskStateChangeEventBase(new_state={self._new_state}, entity_id={self._entity_id})"
-
-
-class TaskCreatedStateChangeEvent(TaskStateChangeEventBase):
-    """TaskCreatedStateChangeEvent is a type for task created events"""
-
-    def __init__(self, entity_id: str):
-        super().__init__(new_state="created", entity_id=entity_id)
-
-    def from_dict(msg_dict: dict):
-        return TaskCreatedStateChangeEvent(msg_dict["entity_id"])
-
-    def __repr__(self) -> str:
-        return f"TaskCreatedStateChangeEvent(entity_id={self._entity_id})"
-
-
-class TaskUpdatedStateChangeEvent(TaskStateChangeEventBase):
-    """TaskUpdatedStateChangeEvent is a type for task updated events"""
-
-    def __init__(self, entity_id: str):
-        super().__init__(new_state="updated", entity_id=entity_id)
-
-    def from_dict(msg_dict: dict):
-        return TaskUpdatedStateChangeEvent(msg_dict["entity_id"])
-
-    def __repr__(self) -> str:
-        return f"TaskUpdatedStateChangeEvent(entity_id={self._entity_id})"
-
-
-class UserCreatedStateChangeEvent(StateChangeEventBase):
-    """UserCreatedStateChangeEvent is a type for user created events"""
-
-    def __init__(self, entity_id: str):
-        super().__init__(entity_type="user", new_state="created", entity_id=entity_id)
-
-    def from_dict(msg_dict: dict):
-        return UserCreatedStateChangeEvent(msg_dict["entity_id"])
-
-    def __repr__(self) -> str:
-        return f"UserCreatedStateChangeEvent(entity_id={self._entity_id})"
 
 
 class Subscription:
@@ -198,7 +146,19 @@ class ConsumerApp:
         topic_name = f"{parts[1]}-{parts[2]}"
         return topic_name
 
-    def _get_payload_converter_from_method(func):
+    def _get_event_class_name_from_method(func):
+        function_name = func.__name__
+        if not function_name.startswith("on_"):
+            raise Exception(
+                f"Function name must be in the form on_<entity-name>_<event-name>")
+        parts = function_name.split("_")
+        if len(parts) < 3:
+            raise Exception(
+                f"Function name must be in the form on_<entity-name>_<event-name>")
+        topic_name = f"{parts[1]}-{parts[2]}"
+        return topic_name
+
+    def _get_payload_converter_from_method(self, func):
         argspec = inspect.getfullargspec(func)
 
         # For simplicity currently, limit to a single argument that is the notification payload
