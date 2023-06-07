@@ -39,3 +39,6 @@ undeploy-from-k8s:
 
 py-format:
 	black src
+
+test:
+	pytest -v 

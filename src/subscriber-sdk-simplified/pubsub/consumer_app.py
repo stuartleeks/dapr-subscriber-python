@@ -2,7 +2,6 @@ import asyncio
 from enum import Enum
 import functools
 import inspect
-import re
 import jsons
 import logging
 import os
@@ -12,6 +11,7 @@ from azure.servicebus import ServiceBusReceivedMessage
 from azure.identity.aio import WorkloadIdentityCredential
 from timeit import default_timer as timer
 
+from . import case
 from dotenv import load_dotenv
 
 # TODO - refactor config storage/handling
@@ -144,19 +144,11 @@ class ConsumerApp:
         for event_class in event_classes:
             self.logger.info(f"Found state event class: {event_class}")
 
-    #
-    # TODO - revist the conventions here
-    # e.g. should we allow on_task_in_progress which mapps to TaskInProgressState
-    #
-
     def _get_topic_name_from_method(func):
         function_name = func.__name__
         if not function_name.startswith("on_"):
             raise Exception(f"Function name must be in the form on_<entity-name>_<event-name>")
-        parts = function_name.split("_")
-        if len(parts) < 3:
-            raise Exception(f"Function name must be in the form on_<entity-name>_<event-name>")
-        topic_name = f"{parts[1]}-{parts[2]}"
+        topic_name = case.snake_to_kebab_case(function_name[3:])
         return topic_name
 
     def _get_event_class_from_method(self, func):
@@ -170,15 +162,8 @@ class ConsumerApp:
 
         topic_name = event_class_name.replace("StateChangeEvent", "")
 
-        return ConsumerApp._pascal_to_kebab_case(topic_name)
+        return case.pascal_to_kebab_case(topic_name)
 
-    def _pascal_to_kebab_case(s):
-        # explain regex:
-        # (?<!^) - negative lookbehind, don't match the start of the string
-        # (?=[A-Z]) - positive lookahead, match any uppercase letter
-        # so this matches any uppercase letter that is not at the start of the string
-        # and inserts a dash before it
-        return re.sub(r"(?<!^)(?=[A-Z])", "-", s).lower()
 
     def _get_payload_converter_from_method(self, func):
         argspec = inspect.getfullargspec(func)

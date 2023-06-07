@@ -3,3 +3,4 @@ deploy.yaml
 .env
 local.secret.json
 test_*.py
+tests

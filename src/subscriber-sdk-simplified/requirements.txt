@@ -3,3 +3,4 @@ azure-identity
 aiohttp
 python-dotenv
 jsons
+pytest
