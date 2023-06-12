@@ -107,7 +107,8 @@ class Subscription:
 class ConsumerApp:
     """ConsumerApp is a helper for simplifying the consumption of messages from a Service Bus topic/subscription"""
 
-    subscriptions: list[Subscription]
+    _subscriptions: list[Subscription]
+    _is_cancelled: bool = False
 
     def __init__(
         self,
@@ -118,7 +119,7 @@ class ConsumerApp:
     ):
         self.logger = logging.getLogger(__name__)
         self.logger.info("SubscriberApp initialized")
-        self.subscriptions = []
+        self._subscriptions = []
         if not default_subscription_name:
             default_subscription_name = os.environ.get("DEFAULT_SUBSCRIPTION_NAME")
         if not default_subscription_name:
@@ -163,7 +164,6 @@ class ConsumerApp:
         topic_name = event_class_name.replace("StateChangeEvent", "")
 
         return case.pascal_to_kebab_case(topic_name)
-
 
     def _get_payload_converter_from_method(self, func):
         argspec = inspect.getfullargspec(func)
@@ -214,58 +214,11 @@ class ConsumerApp:
             nonlocal subscription_name
             nonlocal topic_name
 
-            notification_type = ConsumerApp._get_topic_name_from_method(func)
-
-            if subscription_name is None:
-                subscription_name = self.default_subscription_name
-            # TODO validate notification_type is a valid base for topic name?
-
-            if topic_name is None:
-                topic_name = notification_type
-                self.logger.debug(f"topic_name not set, using topic_name from function name: {topic_name}")
-
-            self.logger.info(
-                f"🔎 Found consumer {func.__qualname__} (topic={topic_name}, subscription={subscription_name}"
+            # Generate Subscription to capture func ready for use in run() later
+            subscription = self._get_subscription_from_method(
+                func, topic_name, subscription_name, max_message_count, max_wait_time, max_lock_renewal_duration
             )
-
-            payload_converter = self._get_payload_converter_from_method(func)
-
-            async def wrap_handler(receiver: ServiceBusReceiver, msg: ServiceBusReceivedMessage):
-                try:
-                    # Convert message to correct payload type
-                    parsed_message = jsons.loads(str(msg), dict)
-                    payload = payload_converter(parsed_message)
-
-                    # Call the decorated function
-                    result = await func(payload)
-
-                    # Handle the response
-                    if result == ConsumerResult.RETRY:
-                        self.logger.info(f"Handler returned RETRY ({msg.message_id}) - abandoning")
-                        await receiver.abandon_message(msg)
-                    elif result == ConsumerResult.DROP:
-                        self.logger.info(f"Handler returned DROP ({msg.message_id}) - deadlettering")
-                        await receiver.dead_letter_message(msg, reason="dropped by subscriber")
-                    else:
-                        # Other return values are treated as success
-                        self.logger.info(f"Handler returned successfully ({msg.message_id}) - completing")
-                        await receiver.complete_message(msg)
-                except Exception as e:
-                    self.logger.info(f"Error processing message ({msg.message_id}) - abandoning: {e}")
-                    await receiver.abandon_message(msg)
-
-            func_name = func.__qualname__
-            self.subscriptions.append(
-                Subscription(
-                    topic=topic_name,
-                    subscription_name=subscription_name,
-                    handler=wrap_handler,
-                    func_name=func_name,
-                    max_message_count=max_message_count,
-                    max_wait_time=max_wait_time,
-                    max_lock_renewal_duration=max_lock_renewal_duration,
-                )
-            )
+            self._subscriptions.append(subscription)
             return func
 
         if func is None:
@@ -275,11 +228,74 @@ class ConsumerApp:
             # We are called as a simple decorator
             return decorator(func)
 
+    def _get_subscription_from_method(
+        self,
+        func,
+        topic_name: Optional[str] = None,
+        subscription_name: Optional[str] = None,
+        max_message_count: Optional[int] = None,
+        max_wait_time: Optional[int] = None,
+        max_lock_renewal_duration: Optional[int] = None,
+    ):
+        notification_type = ConsumerApp._get_topic_name_from_method(func)
+
+        if subscription_name is None:
+            subscription_name = self.default_subscription_name
+
+        if topic_name is None:
+            topic_name = notification_type
+            self.logger.debug(f"topic_name not set, using topic_name from function name: {topic_name}")
+
+        if self._topic_to_event_class_map.get(topic_name, None) is None:
+            raise Exception(f"No event class found to match topic name '{topic_name}'")
+
+        self.logger.info(f"🔎 Found consumer {func.__qualname__} (topic={topic_name}, subscription={subscription_name}")
+
+        payload_converter = self._get_payload_converter_from_method(func)
+
+        async def wrap_handler(receiver: ServiceBusReceiver, msg: ServiceBusReceivedMessage):
+            try:
+                # Convert message to correct payload type
+                parsed_message = jsons.loads(str(msg), dict)
+                payload = payload_converter(parsed_message)
+
+                # Call the decorated function
+                result = await func(payload)
+
+                # Handle the response
+                if result == ConsumerResult.RETRY:
+                    self.logger.info(f"Handler returned RETRY ({msg.message_id}) - abandoning")
+                    await receiver.abandon_message(msg)
+                elif result == ConsumerResult.DROP:
+                    self.logger.info(f"Handler returned DROP ({msg.message_id}) - deadlettering")
+                    await receiver.dead_letter_message(msg, reason="dropped by subscriber")
+                else:
+                    # Other return values are treated as success
+                    self.logger.info(f"Handler returned successfully ({msg.message_id}) - completing")
+                    await receiver.complete_message(msg)
+            except Exception as e:
+                self.logger.info(f"Error processing message ({msg.message_id}) - abandoning: {e}")
+                await receiver.abandon_message(msg)
+
+        func_name = func.__qualname__
+        subscription = Subscription(
+            topic=topic_name,
+            subscription_name=subscription_name,
+            handler=wrap_handler,
+            func_name=func_name,
+            max_message_count=max_message_count,
+            max_wait_time=max_wait_time,
+            max_lock_renewal_duration=max_lock_renewal_duration,
+        )
+        return subscription
+
     async def _process_subscription(self, servicebus_client: ServiceBusClient, subscription: Subscription):
         receiver = servicebus_client.get_subscription_receiver(
             topic_name=subscription.topic,
             subscription_name=subscription.subscription_name,
         )
+        # TODO - set up a logger for the subscription that includes the topic and subscription with log output
+
         max_message_count = subscription.max_message_count or self.max_message_count
         max_wait_time = subscription.max_wait_time or self.max_wait_time
         max_lock_renewal_duration = subscription.max_lock_renewal_duration or self.max_lock_renewal_duration
@@ -290,8 +306,9 @@ class ConsumerApp:
             self.logger.info(
                 f"👂 Starting message receiver for {subscription.func_name} (topic={subscription.topic}, subscription={subscription.subscription_name}..."
             )
-            while True:
+            while not self._is_cancelled:
                 # TODO: Add back-off logic when no messages?
+                self.logger.debug("Receiving messages...")
                 received_msgs = await receiver.receive_messages(
                     max_message_count=max_message_count, max_wait_time=max_wait_time
                 )
@@ -314,10 +331,16 @@ class ConsumerApp:
                 duration = end - start
                 self.logger.info(f"📦 Batch done, size={len(received_msgs)}, duration={duration}s")
 
+            self.logger.info(
+                f"Finished processing messages for {subscription.func_name} (topic={subscription.topic}, subscription={subscription.subscription_name})"
+            )
+
     async def run(self):
         """Run the consumer app, i.e. begin processing messages from the Service Bus subscriptions"""
 
-        if len(self.subscriptions) == 0:
+        # TODO - ensure only a single runner, check not cancelled, ...
+
+        if len(self._subscriptions) == 0:
             raise Exception("No consumers registered - ensure you have added @consumer decorators to your handlers")
 
         workload_identity_credential = None
@@ -341,13 +364,19 @@ class ConsumerApp:
 
         try:
             async with servicebus_client:
+                self.logger.info("Starting subscription processors...")
                 await asyncio.gather(
                     *[
                         self._process_subscription(servicebus_client, subscription)
-                        for subscription in self.subscriptions
+                        for subscription in self._subscriptions
                     ]
                 )
+                self.logger.info("Subscription processors completed")
 
         finally:
             if workload_identity_credential:
                 await workload_identity_credential.close()
+
+    def cancel(self):
+        """Mark the consumer app as cancelled to shut down processing loops"""
+        self._is_cancelled = True

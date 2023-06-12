@@ -8,6 +8,7 @@ class SampleEvent1StateChangeEvent(StateChangeEventBase):
     def from_dict(self, data: dict):
         return SampleEvent1StateChangeEvent(data["entity_id"])
 
+
 class SampleMultiPartEventStateChangeEvent(StateChangeEventBase):
     def __init__(self, entity_id: str):
         super().__init__(entity_type="sample", new_state="multi-part-event", entity_id=entity_id)
@@ -36,6 +37,7 @@ def test_get_topic_name_from_class_simple():
     topic_name = ConsumerApp._get_topic_name_from_event_class(SampleEvent1StateChangeEvent)
     assert topic_name == "sample-event1"
 
+
 def test_get_topic_name_from_class_extended():
     topic_name = ConsumerApp._get_topic_name_from_event_class(SampleMultiPartEventStateChangeEvent)
     assert topic_name == "sample-multi-part-event"
@@ -54,6 +56,7 @@ def test_get_event_class_for_method_simple():
     app = ConsumerApp(default_subscription_name="test-subscription")
     event_class = app._get_event_class_from_method(on_sample_event1)
     assert event_class == SampleEvent1StateChangeEvent
+
 
 def test_get_event_class_for_method_extended():
     def on_sample_multi_part_event():
