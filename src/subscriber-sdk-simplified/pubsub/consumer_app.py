@@ -1,10 +1,11 @@
 import asyncio
-from enum import Enum
 import functools
 import inspect
 import jsons
 import logging
 import os
+import signal
+from enum import Enum
 from typing import Optional
 from azure.servicebus.aio import ServiceBusClient, AutoLockRenewer, ServiceBusReceiver
 from azure.servicebus import ServiceBusReceivedMessage
@@ -125,9 +126,12 @@ class ConsumerApp:
         if not default_subscription_name:
             raise Exception("default_subscription_name must be provided or set in env var DEFAULT_SUBSCRIPTION_NAME")
         self.default_subscription_name = default_subscription_name
+
+        # TODO - allow these to be set via env vars
         self.max_message_count = max_message_count
         self.max_wait_time = max_wait_time
         self.max_lock_renewal_duration = max_lock_renewal_duration
+
         self._init_event_classes()
 
     def _init_event_classes(self):
@@ -143,7 +147,7 @@ class ConsumerApp:
         }
 
         for event_class in event_classes:
-            self.logger.info(f"Found state event class: {event_class}")
+            self.logger.info(f"🔎 Found state event class: {event_class}")
 
     def _get_topic_name_from_method(func):
         function_name = func.__name__
@@ -308,6 +312,9 @@ class ConsumerApp:
             )
             while not self._is_cancelled:
                 # TODO: Add back-off logic when no messages?
+                #       This could allow longer wait times with more efficient termination
+                #       But it would increase the time to process new messages after a period of inactivity
+
                 self.logger.debug("Receiving messages...")
                 received_msgs = await receiver.receive_messages(
                     max_message_count=max_message_count, max_wait_time=max_wait_time
@@ -335,10 +342,17 @@ class ConsumerApp:
                 f"Finished processing messages for {subscription.func_name} (topic={subscription.topic}, subscription={subscription.subscription_name})"
             )
 
+    def _sigterm_handler(self, sig: int, frame):
+        """Handle a SIGTERM by cancelling the consumer app"""
+        self.logger.info(f"Received SIGTERM, calling cancel")
+        self.cancel()
+
     async def run(self):
         """Run the consumer app, i.e. begin processing messages from the Service Bus subscriptions"""
 
         # TODO - ensure only a single runner, check not cancelled, ...
+
+        signal.signal(signal.SIGTERM, self._sigterm_handler)
 
         if len(self._subscriptions) == 0:
             raise Exception("No consumers registered - ensure you have added @consumer decorators to your handlers")
