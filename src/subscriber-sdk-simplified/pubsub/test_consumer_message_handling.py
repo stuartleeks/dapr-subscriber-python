@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import pytest
 from datetime import timedelta
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -308,3 +307,9 @@ def test_consumer_dead_letters_message_when_retry_is_returned():
     dead_lettered_message = mock_receiver.dead_letter_message.call_args[0][0]
     assert str(dead_lettered_message) == '{"entity_id": "123"}', "Unexpected message dead-lettered"
 
+
+# TODO
+#  - test renew lock
+#  - test concurrent message handling
+#  - test multiple subscriptions
+#  - test cancellation waits for messages but doesn't send new ones
