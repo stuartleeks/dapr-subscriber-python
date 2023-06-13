@@ -25,5 +25,7 @@ spec:
             value: $SERVICE_BUS_NAMESPACE
           - name: DEFAULT_SUBSCRIPTION_NAME
             value: subscriber-sdk-simplified
+          - name: MAX_MESSAGE_COUNT
+            value: "25"
         imagePullPolicy: Always
         # TODO - set env vars for connection string, topic name, subscription name
