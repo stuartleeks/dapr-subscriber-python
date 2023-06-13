@@ -56,7 +56,13 @@ class MockReceivedMessage(ServiceBusReceivedMessage):
 
 
 def mock_get_subscription_receiver(expected_topic_name, expected_subscription_name, messages: list[str] = []):
+    receiver = None
+
     def side_effect(topic_name, subscription_name):
+        nonlocal receiver
+        if receiver is not None:
+            return receiver
+
         if topic_name != expected_topic_name:
             assert False, "Unexpected topic name: " + topic_name
         if subscription_name != expected_subscription_name:
@@ -68,7 +74,11 @@ def mock_get_subscription_receiver(expected_topic_name, expected_subscription_na
         async def receive_messages(max_message_count=None, max_wait_time=None):
             nonlocal messages
             logging.info("In receive_messages")
-            # await asyncio.sleep(max_wait_time or 0.1)
+            if messages == []:
+                logging.info(f"No messages to return - sleeping (max_wait_time: {max_wait_time})")
+                await asyncio.sleep(max_wait_time or 1)
+                return []
+
             messages_to_return = [
                 MockReceivedMessage(data_body=message, receiver=mock_receiver) for message in messages
             ]
@@ -83,6 +93,15 @@ def mock_get_subscription_receiver(expected_topic_name, expected_subscription_na
         return mock_receiver
 
     return side_effect
+
+
+async def run_app_with_timeout(app: ConsumerApp, timeout_seconds: int = 1):
+    async def cancel_after_n_seconds(n):
+        await asyncio.sleep(n)
+        app.cancel()
+
+    logging.info("Calling app.run...")
+    await asyncio.gather(app.run(), cancel_after_n_seconds(timeout_seconds))
 
 
 class SampleEventStateChangeEvent(StateChangeEventBase):
@@ -111,15 +130,45 @@ def test_consumer_receives_single_message():
             nonlocal received_message
             logging.info("In on_sample_event")
             received_message = message
-            logging.info("Calling app.cancel...")
-            app.cancel()
 
-        # Directly call consume rather than decorating
-        app.consume(on_sample_event)
+        # Directly call consume rather than decorating to keep tests encapsulated
+        app.consume(on_sample_event, max_wait_time=0.1)
 
-        ## TODO - run app until we have the message processsed (init for n seconds)
-        logging.info("Calling app.run...")
-        asyncio.run(app.run())
+        asyncio.run(run_app_with_timeout(app, timeout_seconds=0.1))
 
     assert isinstance(received_message, SampleEventStateChangeEvent), "Unexpected message type"
     assert received_message.entity_id == "123", "Unexpected message body"
+
+
+def test_consumer_completes_message_when_no_return_value():
+    global on_message
+
+    mock_sb_client = AsyncMock(spec=ServiceBusClient)
+    messages = ['{"entity_id": "123"}']
+    # TODO - temp hack to re-use existing function - clean up if this approach works overall
+    mock_receiver = mock_get_subscription_receiver("sample-event", "TEST_SUB", messages=messages)(
+        "sample-event", "TEST_SUB"
+    )
+    mock_sb_client.get_subscription_receiver = Mock(return_value=mock_receiver)
+    with patch("azure.servicebus.aio.ServiceBusClient.from_connection_string", return_value=mock_sb_client):
+        app = ConsumerApp(default_subscription_name="TEST_SUB")
+
+        received_message = None
+
+        async def on_sample_event(message: SampleEventStateChangeEvent):
+            nonlocal received_message
+            logging.info("In on_sample_event")
+            received_message = message
+
+        # Directly call consume rather than decorating to keep tests encapsulated
+        app.consume(on_sample_event, max_wait_time=0.1)
+
+        # Here we set timeout_seconds to 1 which will invoke the cancel() method after 1 second
+        # The message processor will sleep for 2 seconds
+        asyncio.run(run_app_with_timeout(app, timeout_seconds=0.1))
+
+    assert isinstance(received_message, SampleEventStateChangeEvent), "Unexpected message type"
+    assert received_message.entity_id == "123", "Unexpected message body"
+    assert mock_receiver.complete_message.call_count == 1, "Message not completed"
+    completed_message = mock_receiver.complete_message.call_args[0][0]
+    assert str(completed_message) == '{"entity_id": "123"}', "Unexpected message completed"
