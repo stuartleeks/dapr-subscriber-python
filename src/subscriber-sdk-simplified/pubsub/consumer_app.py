@@ -25,6 +25,10 @@ AZURE_AUTHORITY_HOST = os.getenv("AZURE_AUTHORITY_HOST", "")
 AZURE_FEDERATED_TOKEN_FILE = os.getenv("AZURE_FEDERATED_TOKEN_FILE", "")
 SERVICE_BUS_NAMESPACE = os.getenv("SERVICE_BUS_NAMESPACE", "")
 
+MAX_MESSAGE_COUNT = int(os.getenv("MAX_MESSAGE_COUNT", "10"))
+MAX_WAIT_TIME = int(os.getenv("MAX_WAIT_TIME", "30"))
+MAX_LOCK_RENEWAL_DURATION = int(os.getenv("MAX_LOCK_RENEWAL_DURATION", "300"))
+
 
 class ConsumerResult(Enum):
     """ConsumerResult is used to indicate the result when a consumer processes a message"""
@@ -110,27 +114,33 @@ class ConsumerApp:
 
     _subscriptions: list[Subscription]
     _is_cancelled: bool = False
+    _default_subscription_name: str
+    _logger: logging.Logger
+    _payload_type_converters: dict
+    _topic_to_event_class_map: dict
+    _default_max_message_count: int
+    _default_max_wait_time: int
+    _default_max_lock_renewal_duration: int
 
     def __init__(
         self,
         default_subscription_name: str = None,
-        max_message_count: int = 10,
-        max_wait_time: int = 30,
-        max_lock_renewal_duration: int = 5 * 60,
+        max_message_count: int = None,
+        max_wait_time: int = None,
+        max_lock_renewal_duration: int = None,
     ):
-        self.logger = logging.getLogger(__name__)
-        self.logger.info("SubscriberApp initialized")
+        self._logger = logging.getLogger(__name__)
+        self._logger.info("SubscriberApp initialized")
         self._subscriptions = []
         if not default_subscription_name:
             default_subscription_name = os.environ.get("DEFAULT_SUBSCRIPTION_NAME")
         if not default_subscription_name:
             raise Exception("default_subscription_name must be provided or set in env var DEFAULT_SUBSCRIPTION_NAME")
-        self.default_subscription_name = default_subscription_name
+        self._default_subscription_name = default_subscription_name
 
-        # TODO - allow these to be set via env vars
-        self.max_message_count = max_message_count
-        self.max_wait_time = max_wait_time
-        self.max_lock_renewal_duration = max_lock_renewal_duration
+        self._default_max_message_count = max_message_count or MAX_MESSAGE_COUNT
+        self._default_max_wait_time = max_wait_time or MAX_WAIT_TIME
+        self._default_max_lock_renewal_duration = max_lock_renewal_duration or MAX_LOCK_RENEWAL_DURATION
 
         self._init_event_classes()
 
@@ -147,7 +157,7 @@ class ConsumerApp:
         }
 
         for event_class in event_classes:
-            self.logger.info(f"🔎 Found state event class: {event_class}")
+            self._logger.info(f"🔎 Found state event class: {event_class}")
 
     def _get_topic_name_from_method(func):
         function_name = func.__name__
@@ -180,15 +190,15 @@ class ConsumerApp:
         if arg0_annotation is None:
             # default to dict for now
             # TODO - use func name to determine default type
-            self.logger.debug("No event payload annotation found, defaulting to dict")
+            self._logger.debug("No event payload annotation found, defaulting to dict")
             arg0_annotation = dict
 
         if arg0_annotation == dict:
             # no conversion needed
-            self.logger.debug("Using no-op converter for dict payload")
+            self._logger.debug("Using no-op converter for dict payload")
             return lambda msg_dict: msg_dict
 
-        self.logger.debug(f"Using converter for payload type: {arg0_annotation}")
+        self._logger.debug(f"Using converter for payload type: {arg0_annotation}")
         converter = self._payload_type_converters.get(arg0_annotation, None)
         if converter is None:
             raise Exception(f"Unsupported payload type: {arg0_annotation}")
@@ -244,16 +254,18 @@ class ConsumerApp:
         notification_type = ConsumerApp._get_topic_name_from_method(func)
 
         if subscription_name is None:
-            subscription_name = self.default_subscription_name
+            subscription_name = self._default_subscription_name
 
         if topic_name is None:
             topic_name = notification_type
-            self.logger.debug(f"topic_name not set, using topic_name from function name: {topic_name}")
+            self._logger.debug(f"topic_name not set, using topic_name from function name: {topic_name}")
 
         if self._topic_to_event_class_map.get(topic_name, None) is None:
             raise Exception(f"No event class found to match topic name '{topic_name}'")
 
-        self.logger.info(f"🔎 Found consumer {func.__qualname__} (topic={topic_name}, subscription={subscription_name}")
+        self._logger.info(
+            f"🔎 Found consumer {func.__qualname__} (topic={topic_name}, subscription={subscription_name}"
+        )
 
         payload_converter = self._get_payload_converter_from_method(func)
 
@@ -268,17 +280,17 @@ class ConsumerApp:
 
                 # Handle the response
                 if result == ConsumerResult.RETRY:
-                    self.logger.info(f"Handler returned RETRY ({msg.message_id}) - abandoning")
+                    self._logger.info(f"Handler returned RETRY ({msg.message_id}) - abandoning")
                     await receiver.abandon_message(msg)
                 elif result == ConsumerResult.DROP:
-                    self.logger.info(f"Handler returned DROP ({msg.message_id}) - deadlettering")
+                    self._logger.info(f"Handler returned DROP ({msg.message_id}) - deadlettering")
                     await receiver.dead_letter_message(msg, reason="dropped by subscriber")
                 else:
                     # Other return values are treated as success
-                    self.logger.info(f"Handler returned successfully ({msg.message_id}) - completing")
+                    self._logger.info(f"Handler returned successfully ({msg.message_id}) - completing")
                     await receiver.complete_message(msg)
             except Exception as e:
-                self.logger.info(f"Error processing message ({msg.message_id}) - abandoning: {e}")
+                self._logger.info(f"Error processing message ({msg.message_id}) - abandoning: {e}")
                 await receiver.abandon_message(msg)
 
         func_name = func.__qualname__
@@ -300,14 +312,14 @@ class ConsumerApp:
         )
         # TODO - set up a logger for the subscription that includes the topic and subscription with log output
 
-        max_message_count = subscription.max_message_count or self.max_message_count
-        max_wait_time = subscription.max_wait_time or self.max_wait_time
-        max_lock_renewal_duration = subscription.max_lock_renewal_duration or self.max_lock_renewal_duration
+        max_message_count = subscription.max_message_count or self._default_max_message_count
+        max_wait_time = subscription.max_wait_time or self._default_max_wait_time
+        max_lock_renewal_duration = subscription.max_lock_renewal_duration or self._default_max_lock_renewal_duration
         async with receiver:
             # AutoLockRenewer performs message lock renewal (for long message processing)
             renewer = AutoLockRenewer(max_lock_renewal_duration=max_lock_renewal_duration)
 
-            self.logger.info(
+            self._logger.info(
                 f"👂 Starting message receiver for {subscription.func_name} (topic={subscription.topic}, subscription={subscription.subscription_name}..."
             )
             while not self._is_cancelled:
@@ -315,36 +327,36 @@ class ConsumerApp:
                 #       This could allow longer wait times with more efficient termination
                 #       But it would increase the time to process new messages after a period of inactivity
 
-                self.logger.debug("Receiving messages...")
+                self._logger.debug("Receiving messages...")
                 received_msgs = await receiver.receive_messages(
                     max_message_count=max_message_count, max_wait_time=max_wait_time
                 )
 
                 if len(received_msgs) == 0:
-                    self.logger.debug(f"No messages received(topic={subscription.topic})")
+                    self._logger.debug(f"No messages received(topic={subscription.topic})")
                     continue
 
-                self.logger.info(f"📦 Batch received, size =  {len(received_msgs)}")
+                self._logger.info(f"📦 Batch received, size =  {len(received_msgs)}")
                 start = timer()
 
                 # Set up message renewal for the batch
                 for msg in received_msgs:
-                    self.logger.debug(f"Received message {msg.message_id}, registering for renewal")
+                    self._logger.debug(f"Received message {msg.message_id}, registering for renewal")
                     renewer.register(receiver, msg)
 
                 # process messages in parallel
                 await asyncio.gather(*[subscription.handler(receiver, msg) for msg in received_msgs])
                 end = timer()
                 duration = end - start
-                self.logger.info(f"📦 Batch done, size={len(received_msgs)}, duration={duration}s")
+                self._logger.info(f"📦 Batch done, size={len(received_msgs)}, duration={duration}s")
 
-            self.logger.info(
+            self._logger.info(
                 f"Finished processing messages for {subscription.func_name} (topic={subscription.topic}, subscription={subscription.subscription_name})"
             )
 
     def _sigterm_handler(self, sig: int, frame):
         """Handle a SIGTERM by cancelling the consumer app"""
-        self.logger.info(f"Received SIGTERM, calling cancel")
+        self._logger.info(f"Received SIGTERM, calling cancel")
         self.cancel()
 
     async def run(self):
@@ -360,9 +372,9 @@ class ConsumerApp:
         workload_identity_credential = None
         servicebus_client = None
 
-        self.logger.info("Connecting to service bus...")
+        self._logger.info("Connecting to service bus...")
         if AZURE_CLIENT_ID and AZURE_TENANT_ID and AZURE_AUTHORITY_HOST and AZURE_FEDERATED_TOKEN_FILE:
-            self.logger.info("Using workload identity credentials")
+            self._logger.info("Using workload identity credentials")
             workload_identity_credential = WorkloadIdentityCredential(
                 client_id=AZURE_CLIENT_ID,
                 tenant_id=AZURE_TENANT_ID,
@@ -373,19 +385,19 @@ class ConsumerApp:
                 credential=workload_identity_credential,
             )
         else:
-            self.logger.info("No workload identity credentials found, using connection string")
+            self._logger.info("No workload identity credentials found, using connection string")
             servicebus_client = ServiceBusClient.from_connection_string(conn_str=CONNECTION_STR)
 
         try:
             async with servicebus_client:
-                self.logger.info("Starting subscription processors...")
+                self._logger.info("Starting subscription processors...")
                 await asyncio.gather(
                     *[
                         self._process_subscription(servicebus_client, subscription)
                         for subscription in self._subscriptions
                     ]
                 )
-                self.logger.info("Subscription processors completed")
+                self._logger.info("Subscription processors completed")
 
         finally:
             if workload_identity_credential:
