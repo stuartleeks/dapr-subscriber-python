@@ -164,13 +164,11 @@ def test_consumer_receives_single_message():
 
         received_message = None
 
+        @app.consume(max_wait_time=0.1)
         async def on_sample_event(message: SampleEventStateChangeEvent):
             nonlocal received_message
             logging.info("In on_sample_event")
             received_message = message
-
-        # Directly call consume rather than decorating to keep tests encapsulated
-        app.consume(on_sample_event, max_wait_time=0.1)
 
         asyncio.run(run_app_with_timeout(app))
 
@@ -187,11 +185,9 @@ def test_consumer_completes_message_when_no_return_value():
     with patch("azure.servicebus.aio.ServiceBusClient.from_connection_string", return_value=mock_sb_client):
         app = ConsumerApp(default_subscription_name="TEST_SUB")
 
+        @app.consume(max_wait_time=0.1)
         async def on_sample_event(message: SampleEventStateChangeEvent):
             logging.info("In on_sample_event")
-
-        # Directly call consume rather than decorating to keep tests encapsulated
-        app.consume(on_sample_event, max_wait_time=0.1)
 
         # Here we set timeout_seconds to 1 which will invoke the cancel() method after 1 second
         # The message processor will sleep for 2 seconds
@@ -212,12 +208,10 @@ def test_consumer_completes_message_when_success_is_returned():
     with patch("azure.servicebus.aio.ServiceBusClient.from_connection_string", return_value=mock_sb_client):
         app = ConsumerApp(default_subscription_name="TEST_SUB")
 
+        @app.consume(max_wait_time=0.1)
         async def on_sample_event(message: SampleEventStateChangeEvent):
             logging.info("In on_sample_event")
             return ConsumerResult.SUCCESS
-
-        # Directly call consume rather than decorating to keep tests encapsulated
-        app.consume(on_sample_event, max_wait_time=0.1)
 
         # Here we set timeout_seconds to 1 which will invoke the cancel() method after 1 second
         # The message processor will sleep for 2 seconds
@@ -238,12 +232,10 @@ def test_consumer_abandons_message_when_retry_is_returned():
     with patch("azure.servicebus.aio.ServiceBusClient.from_connection_string", return_value=mock_sb_client):
         app = ConsumerApp(default_subscription_name="TEST_SUB")
 
+        @app.consume(max_wait_time=0.1)
         async def on_sample_event(message: SampleEventStateChangeEvent):
             logging.info("In on_sample_event")
             return ConsumerResult.RETRY
-
-        # Directly call consume rather than decorating to keep tests encapsulated
-        app.consume(on_sample_event, max_wait_time=0.1)
 
         # Here we set timeout_seconds to 1 which will invoke the cancel() method after 1 second
         # The message processor will sleep for 2 seconds
@@ -264,12 +256,10 @@ def test_consumer_abandons_message_when_handler_raises_exception():
     with patch("azure.servicebus.aio.ServiceBusClient.from_connection_string", return_value=mock_sb_client):
         app = ConsumerApp(default_subscription_name="TEST_SUB")
 
+        @app.consume(max_wait_time=0.1)
         async def on_sample_event(message: SampleEventStateChangeEvent):
             logging.info("In on_sample_event")
             raise Exception("Something went wrong")
-
-        # Directly call consume rather than decorating to keep tests encapsulated
-        app.consume(on_sample_event, max_wait_time=0.1)
 
         # Here we set timeout_seconds to 1 which will invoke the cancel() method after 1 second
         # The message processor will sleep for 2 seconds
@@ -292,14 +282,12 @@ def test_consumer_dead_letters_message_when_retry_is_returned():
 
         received_message = None
 
+        @app.consume(max_wait_time=0.1)
         async def on_sample_event(message: SampleEventStateChangeEvent):
             nonlocal received_message
             logging.info("In on_sample_event")
             received_message = message
             return ConsumerResult.DROP
-
-        # Directly call consume rather than decorating to keep tests encapsulated
-        app.consume(on_sample_event, max_wait_time=0.1)
 
         # Here we set timeout_seconds to 1 which will invoke the cancel() method after 1 second
         # The message processor will sleep for 2 seconds
@@ -326,21 +314,19 @@ def test_consumer_handles_multiple_subscribers():
         received_message1 = None
         received_message2 = None
 
+        @app.consume(max_wait_time=0.1)
         async def on_sample_event1(message: SampleEvent1StateChangeEvent):
             nonlocal received_message1
             logging.info("In on_sample_event1")
             received_message1 = message
             return ConsumerResult.SUCCESS
 
+        @app.consume(max_wait_time=0.1)
         async def on_sample_event2(message: SampleEvent2StateChangeEvent):
             nonlocal received_message2
             logging.info("In on_sample_event2")
             received_message2 = message
             return ConsumerResult.SUCCESS
-
-        # Directly call consume rather than decorating to keep tests encapsulated
-        app.consume(on_sample_event1, max_wait_time=0.1)
-        app.consume(on_sample_event2, max_wait_time=0.1)
 
         # Here we set timeout_seconds to 1 which will invoke the cancel() method after 1 second
         # The message processor will sleep for 2 seconds
@@ -367,21 +353,19 @@ def test_consumer_applies_filter():
         received_message1 = None
         received_message2 = None
 
+        @app.consume(max_wait_time=0.1)
         async def on_sample_event1(message: SampleEvent1StateChangeEvent):
             nonlocal received_message1
             logging.info("In on_sample_event1")
             received_message1 = message
             return ConsumerResult.SUCCESS
 
+        @app.consume(max_wait_time=0.1)
         async def on_sample_event2(message: SampleEvent2StateChangeEvent):
             nonlocal received_message2
             logging.info("In on_sample_event2")
             received_message2 = message
             return ConsumerResult.SUCCESS
-
-        # Directly call consume rather than decorating to keep tests encapsulated
-        app.consume(on_sample_event1, max_wait_time=0.1)
-        app.consume(on_sample_event2, max_wait_time=0.1)
 
         # Here we set timeout_seconds to 1 which will invoke the cancel() method after 1 second
         # The message processor will sleep for 2 seconds
