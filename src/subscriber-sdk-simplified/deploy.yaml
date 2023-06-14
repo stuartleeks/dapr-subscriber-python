@@ -28,4 +28,3 @@ spec:
           - name: MAX_MESSAGE_COUNT
             value: "25"
         imagePullPolicy: Always
-        # TODO - set env vars for connection string, topic name, subscription name
