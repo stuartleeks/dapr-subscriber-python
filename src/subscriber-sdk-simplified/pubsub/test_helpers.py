@@ -22,7 +22,6 @@ class MockReceivedMessage(ServiceBusReceivedMessage):
         # value_body = kwargs.pop("value_body", None)
         data_body = kwargs.pop("data_body", None)
         value_message = AmqpAnnotatedMessage(
-            # value_body=value_body,
             data_body=data_body,
         )
         self._raw_amqp_message = value_message
@@ -31,7 +30,6 @@ class MockReceivedMessage(ServiceBusReceivedMessage):
         self._received_timestamp_utc = utc_now()
         self.locked_until_utc = self._received_timestamp_utc + timedelta(seconds=self._lock_duration)
         self._settled = False
-        # self._receiver = MockReceiver()
         self._receiver = kwargs.pop("receiver", None)
 
         self._prevent_renew_lock = prevent_renew_lock
