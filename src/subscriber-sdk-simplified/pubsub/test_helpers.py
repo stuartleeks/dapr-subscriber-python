@@ -73,7 +73,7 @@ class MockServiceBusClientBuilder:
         topic[subscription_name] = messages
         return self
 
-    def get_subscription_receiver(self, topic_name, subscription_name):
+    def get_subscription_receiver(self, topic_name, subscription_name, auto_lock_renewer=None):
         key = f"{topic_name}|{subscription_name}"
         receiver = self._topic_subscription_receivers.get(key)
         if not receiver is None:

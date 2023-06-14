@@ -308,19 +308,20 @@ class ConsumerApp:
         return subscription
 
     async def _process_subscription(self, servicebus_client: ServiceBusClient, subscription: Subscription):
-        receiver = servicebus_client.get_subscription_receiver(
-            topic_name=subscription.topic,
-            subscription_name=subscription.subscription_name,
-        )
-        # TODO - set up a logger for the subscription that includes the topic and subscription with log output
-
+        # AutoLockRenewer performs message lock renewal (for long message processing)
         max_message_count = subscription.max_message_count or self._default_max_message_count
         max_wait_time = subscription.max_wait_time or self._default_max_wait_time
         max_lock_renewal_duration = subscription.max_lock_renewal_duration or self._default_max_lock_renewal_duration
-        async with receiver:
-            # AutoLockRenewer performs message lock renewal (for long message processing)
-            renewer = AutoLockRenewer(max_lock_renewal_duration=max_lock_renewal_duration)
 
+        renewer = AutoLockRenewer(max_lock_renewal_duration=max_lock_renewal_duration)
+        receiver = servicebus_client.get_subscription_receiver(
+            topic_name=subscription.topic,
+            subscription_name=subscription.subscription_name,
+            auto_lock_renewer=renewer,
+        )
+        # TODO - set up a logger for the subscription that includes the topic and subscription with log output
+
+        async with receiver:
             self._logger.info(
                 f"👂 Starting message receiver for {subscription.func_name} (topic={subscription.topic}, subscription={subscription.subscription_name}..."
             )
@@ -340,11 +341,6 @@ class ConsumerApp:
 
                 self._logger.info(f"📦 Batch received, size =  {len(received_msgs)}")
                 start = timer()
-
-                # Set up message renewal for the batch
-                for msg in received_msgs:
-                    self._logger.debug(f"Received message {msg.message_id}, registering for renewal")
-                    renewer.register(receiver, msg)
 
                 # process messages in parallel
                 await asyncio.gather(*[subscription.handler(receiver, msg) for msg in received_msgs])
