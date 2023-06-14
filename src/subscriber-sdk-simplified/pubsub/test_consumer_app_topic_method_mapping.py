@@ -1,12 +1,12 @@
 from .consumer_app import ConsumerApp, StateChangeEventBase
 
 
-class SampleEvent1StateChangeEvent(StateChangeEventBase):
+class SampleSimpleStateChangeEvent(StateChangeEventBase):
     def __init__(self, entity_id: str):
         super().__init__(entity_type="sample", new_state="event1", entity_id=entity_id)
 
     def from_dict(self, data: dict):
-        return SampleEvent1StateChangeEvent(data["entity_id"])
+        return SampleSimpleStateChangeEvent(data["entity_id"])
 
 
 class SampleMultiPartEventStateChangeEvent(StateChangeEventBase):
@@ -14,7 +14,7 @@ class SampleMultiPartEventStateChangeEvent(StateChangeEventBase):
         super().__init__(entity_type="sample", new_state="multi-part-event", entity_id=entity_id)
 
     def from_dict(self, data: dict):
-        return SampleEvent1StateChangeEvent(data["entity_id"])
+        return SampleMultiPartEventStateChangeEvent(data["entity_id"])
 
 
 def test_get_topic_name_simple():
@@ -34,8 +34,8 @@ def test_get_topic_name_extended():
 
 
 def test_get_topic_name_from_class_simple():
-    topic_name = ConsumerApp._get_topic_name_from_event_class(SampleEvent1StateChangeEvent)
-    assert topic_name == "sample-event1"
+    topic_name = ConsumerApp._get_topic_name_from_event_class(SampleSimpleStateChangeEvent)
+    assert topic_name == "sample-simple"
 
 
 def test_get_topic_name_from_class_extended():
@@ -45,17 +45,17 @@ def test_get_topic_name_from_class_extended():
 
 def test_event_classes_discovered():
     app = ConsumerApp(default_subscription_name="test-subscription")
-    assert app._topic_to_event_class_map.get("sample-event1") == SampleEvent1StateChangeEvent
+    assert app._topic_to_event_class_map.get("sample-simple") == SampleSimpleStateChangeEvent
     assert app._topic_to_event_class_map.get("sample-multi-part-event") == SampleMultiPartEventStateChangeEvent
 
 
 def test_get_event_class_for_method_simple():
-    def on_sample_event1():
+    def on_sample_simple():
         pass
 
     app = ConsumerApp(default_subscription_name="test-subscription")
-    event_class = app._get_event_class_from_method(on_sample_event1)
-    assert event_class == SampleEvent1StateChangeEvent
+    event_class = app._get_event_class_from_method(on_sample_simple)
+    assert event_class == SampleSimpleStateChangeEvent
 
 
 def test_get_event_class_for_method_extended():

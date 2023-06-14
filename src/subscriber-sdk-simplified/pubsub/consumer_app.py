@@ -29,6 +29,8 @@ MAX_MESSAGE_COUNT = int(os.getenv("MAX_MESSAGE_COUNT", "10"))
 MAX_WAIT_TIME = int(os.getenv("MAX_WAIT_TIME", "30"))
 MAX_LOCK_RENEWAL_DURATION = int(os.getenv("MAX_LOCK_RENEWAL_DURATION", "300"))
 
+SUBSCRIBER_FILTER = os.getenv("SUBSCRIBER_FILTER", None)
+
 
 class ConsumerResult(Enum):
     """ConsumerResult is used to indicate the result when a consumer processes a message"""
@@ -359,12 +361,14 @@ class ConsumerApp:
         self._logger.info(f"Received SIGTERM, calling cancel")
         self.cancel()
 
-    async def run(self):
-        """Run the consumer app, i.e. begin processing messages from the Service Bus subscriptions"""
+    async def run(self, filter: Optional[list[str]] = None):
+        """Run the consumer app, i.e. begin processing messages from the Service Bus subscriptions
+
+        Args:
+            filter (Optional[list[str]]): A list of topic+subscription filters. Filters should be in the form "<topic-name>|<subscription-name>", e.g. "task-created|my-subscription". If not specified, defaults to the value from the SUBSCRIBER_FILTER environment variable (or None if not set).
+        """
 
         # TODO - ensure only a single runner, check not cancelled, ...
-
-        signal.signal(signal.SIGTERM, self._sigterm_handler)
 
         if len(self._subscriptions) == 0:
             raise Exception("No consumers registered - ensure you have added @consumer decorators to your handlers")
@@ -388,13 +392,25 @@ class ConsumerApp:
             self._logger.info("No workload identity credentials found, using connection string")
             servicebus_client = ServiceBusClient.from_connection_string(conn_str=CONNECTION_STR)
 
+        signal.signal(signal.SIGTERM, self._sigterm_handler)
+
         try:
             async with servicebus_client:
                 self._logger.info("Starting subscription processors...")
+                if filter is None:
+                    if not SUBSCRIBER_FILTER is None:
+                        self._logger.info(
+                            f"Using filter from SUBSCRIBER_FILTER environment variable: {SUBSCRIBER_FILTER}"
+                        )
+                        filter = SUBSCRIBER_FILTER.split(",")
+                else:
+                    self._logger.info(f"Using filter from argument: {filter}")
+
                 await asyncio.gather(
                     *[
                         self._process_subscription(servicebus_client, subscription)
                         for subscription in self._subscriptions
+                        if filter is None or f"{subscription.topic}|{subscription.subscription_name}" in filter
                     ]
                 )
                 self._logger.info("Subscription processors completed")

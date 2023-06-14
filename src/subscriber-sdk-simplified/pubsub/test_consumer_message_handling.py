@@ -1,3 +1,4 @@
+from typing import Optional
 import asyncio
 import logging
 from datetime import timedelta
@@ -116,13 +117,13 @@ class MockServiceBusClientBuilder:
         return mock_sb_client
 
 
-async def run_app_with_timeout(app: ConsumerApp, timeout_seconds: int = 0.1):
+async def run_app_with_timeout(app: ConsumerApp, timeout_seconds: int = 0.1, filter: Optional[list[str]] = None):
     async def cancel_after_n_seconds(n):
         await asyncio.sleep(n)
         app.cancel()
 
     logging.info("Calling app.run...")
-    await asyncio.gather(app.run(), cancel_after_n_seconds(timeout_seconds))
+    await asyncio.gather(app.run(filter=filter), cancel_after_n_seconds(timeout_seconds))
 
 
 class SampleEventStateChangeEvent(StateChangeEventBase):
@@ -132,6 +133,24 @@ class SampleEventStateChangeEvent(StateChangeEventBase):
     def from_dict(data: dict):
         logging.info(f"In SampleEventStateChangeEvent.from_dict: {dict}")
         return SampleEventStateChangeEvent(data["entity_id"])
+
+
+class SampleEvent1StateChangeEvent(StateChangeEventBase):
+    def __init__(self, entity_id: str):
+        super().__init__(entity_type="sample", new_state="event", entity_id=entity_id)
+
+    def from_dict(data: dict):
+        logging.info(f"In SampleEvent1StateChangeEvent.from_dict: {dict}")
+        return SampleEvent1StateChangeEvent(data["entity_id"])
+
+
+class SampleEvent2StateChangeEvent(StateChangeEventBase):
+    def __init__(self, entity_id: str):
+        super().__init__(entity_type="sample", new_state="event", entity_id=entity_id)
+
+    def from_dict(data: dict):
+        logging.info(f"In SampleEvent2StateChangeEvent.from_dict: {dict}")
+        return SampleEvent2StateChangeEvent(data["entity_id"])
 
 
 def test_consumer_receives_single_message():
@@ -168,12 +187,8 @@ def test_consumer_completes_message_when_no_return_value():
     with patch("azure.servicebus.aio.ServiceBusClient.from_connection_string", return_value=mock_sb_client):
         app = ConsumerApp(default_subscription_name="TEST_SUB")
 
-        received_message = None
-
         async def on_sample_event(message: SampleEventStateChangeEvent):
-            nonlocal received_message
             logging.info("In on_sample_event")
-            received_message = message
 
         # Directly call consume rather than decorating to keep tests encapsulated
         app.consume(on_sample_event, max_wait_time=0.1)
@@ -197,12 +212,8 @@ def test_consumer_completes_message_when_success_is_returned():
     with patch("azure.servicebus.aio.ServiceBusClient.from_connection_string", return_value=mock_sb_client):
         app = ConsumerApp(default_subscription_name="TEST_SUB")
 
-        received_message = None
-
         async def on_sample_event(message: SampleEventStateChangeEvent):
-            nonlocal received_message
             logging.info("In on_sample_event")
-            received_message = message
             return ConsumerResult.SUCCESS
 
         # Directly call consume rather than decorating to keep tests encapsulated
@@ -227,12 +238,8 @@ def test_consumer_abandons_message_when_retry_is_returned():
     with patch("azure.servicebus.aio.ServiceBusClient.from_connection_string", return_value=mock_sb_client):
         app = ConsumerApp(default_subscription_name="TEST_SUB")
 
-        received_message = None
-
         async def on_sample_event(message: SampleEventStateChangeEvent):
-            nonlocal received_message
             logging.info("In on_sample_event")
-            received_message = message
             return ConsumerResult.RETRY
 
         # Directly call consume rather than decorating to keep tests encapsulated
@@ -257,12 +264,8 @@ def test_consumer_abandons_message_when_handler_raises_exception():
     with patch("azure.servicebus.aio.ServiceBusClient.from_connection_string", return_value=mock_sb_client):
         app = ConsumerApp(default_subscription_name="TEST_SUB")
 
-        received_message = None
-
         async def on_sample_event(message: SampleEventStateChangeEvent):
-            nonlocal received_message
             logging.info("In on_sample_event")
-            received_message = message
             raise Exception("Something went wrong")
 
         # Directly call consume rather than decorating to keep tests encapsulated
@@ -306,6 +309,87 @@ def test_consumer_dead_letters_message_when_retry_is_returned():
     assert mock_receiver.dead_letter_message.call_count == 1, "Message not dead-lettered"
     dead_lettered_message = mock_receiver.dead_letter_message.call_args[0][0]
     assert str(dead_lettered_message) == '{"entity_id": "123"}', "Unexpected message dead-lettered"
+
+
+def test_consumer_handles_multiple_subscribers():
+    mock_client_builder = MockServiceBusClientBuilder()
+    mock_sb_client = (
+        mock_client_builder.add_messages_for_topic_subscription(
+            "sample-event1", "TEST_SUB", messages=['{"entity_id": "123"}']
+        )
+        .add_messages_for_topic_subscription("sample-event2", "TEST_SUB", messages=['{"entity_id": "456"}'])
+        .build()
+    )
+    with patch("azure.servicebus.aio.ServiceBusClient.from_connection_string", return_value=mock_sb_client):
+        app = ConsumerApp(default_subscription_name="TEST_SUB")
+
+        received_message1 = None
+        received_message2 = None
+
+        async def on_sample_event1(message: SampleEvent1StateChangeEvent):
+            nonlocal received_message1
+            logging.info("In on_sample_event1")
+            received_message1 = message
+            return ConsumerResult.SUCCESS
+
+        async def on_sample_event2(message: SampleEvent2StateChangeEvent):
+            nonlocal received_message2
+            logging.info("In on_sample_event2")
+            received_message2 = message
+            return ConsumerResult.SUCCESS
+
+        # Directly call consume rather than decorating to keep tests encapsulated
+        app.consume(on_sample_event1, max_wait_time=0.1)
+        app.consume(on_sample_event2, max_wait_time=0.1)
+
+        # Here we set timeout_seconds to 1 which will invoke the cancel() method after 1 second
+        # The message processor will sleep for 2 seconds
+        asyncio.run(run_app_with_timeout(app))
+
+    assert isinstance(received_message1, SampleEvent1StateChangeEvent), "Unexpected message type"
+    assert received_message1.entity_id == "123", "Unexpected message body"
+    assert isinstance(received_message2, SampleEvent2StateChangeEvent), "Unexpected message type"
+    assert received_message2.entity_id == "456", "Unexpected message body"
+
+
+def test_consumer_applies_filter():
+    mock_client_builder = MockServiceBusClientBuilder()
+    mock_sb_client = (
+        mock_client_builder.add_messages_for_topic_subscription(
+            "sample-event1", "TEST_SUB", messages=['{"entity_id": "123"}']
+        )
+        .add_messages_for_topic_subscription("sample-event2", "TEST_SUB", messages=['{"entity_id": "456"}'])
+        .build()
+    )
+    with patch("azure.servicebus.aio.ServiceBusClient.from_connection_string", return_value=mock_sb_client):
+        app = ConsumerApp(default_subscription_name="TEST_SUB")
+
+        received_message1 = None
+        received_message2 = None
+
+        async def on_sample_event1(message: SampleEvent1StateChangeEvent):
+            nonlocal received_message1
+            logging.info("In on_sample_event1")
+            received_message1 = message
+            return ConsumerResult.SUCCESS
+
+        async def on_sample_event2(message: SampleEvent2StateChangeEvent):
+            nonlocal received_message2
+            logging.info("In on_sample_event2")
+            received_message2 = message
+            return ConsumerResult.SUCCESS
+
+        # Directly call consume rather than decorating to keep tests encapsulated
+        app.consume(on_sample_event1, max_wait_time=0.1)
+        app.consume(on_sample_event2, max_wait_time=0.1)
+
+        # Here we set timeout_seconds to 1 which will invoke the cancel() method after 1 second
+        # The message processor will sleep for 2 seconds
+        asyncio.run(run_app_with_timeout(app, filter="sample-event2|TEST_SUB"))
+
+    assert received_message1 is None, "Received message when subscriber should have been excluded by filter"
+    assert isinstance(received_message2, SampleEvent2StateChangeEvent), "Unexpected message type"
+    assert received_message2.entity_id == "456", "Unexpected message body"
 
 
 # TODO
