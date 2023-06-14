@@ -148,6 +148,7 @@ class ConsumerApp:
 
     def _init_event_classes(self):
         event_classes = StateChangeEventBase.get_event_classes()
+
         # build a map of event types to converters
         self._payload_type_converters = {
             # note the event_class=event_class to capture the current value of event_class on each iteration
@@ -188,22 +189,22 @@ class ConsumerApp:
         if len(argspec.args) != 1:
             raise Exception("Function must have exactly one argument (the notification)")
 
-        arg0_annotation = argspec.annotations.get(argspec.args[0], None)
-        if arg0_annotation is None:
+        event_class = argspec.annotations.get(argspec.args[0], None)
+        if event_class is None:
             # default to dict for now
             # TODO - use func name to determine default type
-            self._logger.debug("No event payload annotation found, defaulting to dict")
-            arg0_annotation = dict
+            event_class = self._get_event_class_from_method(func)
+            self._logger.debug(f"No event payload annotation found, defaulting to {event_class.__qualname__}")
 
-        if arg0_annotation == dict:
+        if event_class == dict:
             # no conversion needed
             self._logger.debug("Using no-op converter for dict payload")
             return lambda msg_dict: msg_dict
 
-        self._logger.debug(f"Using converter for payload type: {arg0_annotation}")
-        converter = self._payload_type_converters.get(arg0_annotation, None)
+        self._logger.debug(f"Using converter for payload type: {event_class}")
+        converter = self._payload_type_converters.get(event_class, None)
         if converter is None:
-            raise Exception(f"Unsupported payload type: {arg0_annotation}")
+            raise Exception(f"Unsupported payload type: {event_class}")
 
         return converter
 
