@@ -1,4 +1,9 @@
-from .consumer_app import ConsumerApp, StateChangeEventBase
+from .consumer_app import (
+    ConsumerApp,
+    StateChangeEventBase,
+    get_topic_name_from_event_class,
+    get_topic_name_from_method,
+)
 
 
 class SampleSimpleStateChangeEvent(StateChangeEventBase):
@@ -21,7 +26,7 @@ def test_get_topic_name_simple():
     def on_task_created():
         pass
 
-    topic_name = ConsumerApp._get_topic_name_from_method(on_task_created)
+    topic_name = get_topic_name_from_method(on_task_created)
     assert topic_name == "task-created"
 
 
@@ -29,17 +34,17 @@ def test_get_topic_name_extended():
     def on_task_in_progress():
         pass
 
-    topic_name = ConsumerApp._get_topic_name_from_method(on_task_in_progress)
+    topic_name = get_topic_name_from_method(on_task_in_progress)
     assert topic_name == "task-in-progress"
 
 
 def test_get_topic_name_from_class_simple():
-    topic_name = ConsumerApp._get_topic_name_from_event_class(SampleSimpleStateChangeEvent)
+    topic_name = get_topic_name_from_event_class(SampleSimpleStateChangeEvent)
     assert topic_name == "sample-simple"
 
 
 def test_get_topic_name_from_class_extended():
-    topic_name = ConsumerApp._get_topic_name_from_event_class(SampleMultiPartEventStateChangeEvent)
+    topic_name = get_topic_name_from_event_class(SampleMultiPartEventStateChangeEvent)
     assert topic_name == "sample-multi-part-event"
 
 
@@ -65,33 +70,3 @@ def test_get_event_class_for_method_extended():
     app = ConsumerApp(default_subscription_name="test-subscription")
     event_class = app._get_event_class_from_method(on_sample_multi_part_event)
     assert event_class == SampleMultiPartEventStateChangeEvent
-
-
-def test_payload_with_dict_annotation():
-    def on_sample_simple(payload: dict):
-        pass
-
-    app = ConsumerApp(default_subscription_name="test-subscription")
-    converter = app._get_payload_converter_from_method(on_sample_simple)
-    payload = converter({"entity_id": "123"})
-    assert isinstance(payload, dict)
-
-
-def test_payload_with_event_class_annotation():
-    def on_sample_simple(payload: SampleSimpleStateChangeEvent):
-        pass
-
-    app = ConsumerApp(default_subscription_name="test-subscription")
-    converter = app._get_payload_converter_from_method(on_sample_simple)
-    payload = converter({"entity_id": "123"})
-    assert isinstance(payload, SampleSimpleStateChangeEvent)
-
-
-def test_payload_with_no_annotation_uses_event_class():
-    def on_sample_simple(payload):
-        pass
-
-    app = ConsumerApp(default_subscription_name="test-subscription")
-    converter = app._get_payload_converter_from_method(on_sample_simple)
-    payload = converter({"entity_id": "123"})
-    assert isinstance(payload, SampleSimpleStateChangeEvent)

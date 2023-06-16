@@ -10,6 +10,7 @@ from typing import Optional
 from azure.servicebus.aio import ServiceBusClient, AutoLockRenewer, ServiceBusReceiver
 from azure.servicebus import ServiceBusReceivedMessage
 from azure.identity.aio import WorkloadIdentityCredential
+from pydantic import BaseModel, parse_obj_as
 from timeit import default_timer as timer
 
 from . import case
@@ -45,32 +46,10 @@ class ConsumerResult(Enum):
     """The message was not processed successfully but is invalid and should be sent to the dead-letter queue"""
 
 
-class StateChangeEventBase:
+class StateChangeEventBase(BaseModel):
     """StateChangeEventBase is the base type for state change events"""
 
-    _entity_type: str
-    _new_state: str
-    _entity_id: str
-
-    def __init__(self, entity_type: str, entity_id: str, new_state: str):
-        self._entity_type = entity_type
-        self._new_state = new_state
-        self._entity_id = entity_id
-
-    def __repr__(self) -> str:
-        return f"StateChangeEventBase(entity_type={self._entity_type}, new_state={self._new_state}, entity_id={self._entity_id})"
-
-    @property
-    def entity_type(self) -> str:
-        return self._entity_type
-
-    @property
-    def new_state(self) -> str:
-        return self._new_state
-
-    @property
-    def entity_id(self) -> str:
-        return self._entity_id
+    entity_id: str
 
     def get_event_classes():
         event_classes = []
@@ -111,6 +90,24 @@ class Subscription:
         self.max_lock_renewal_duration = max_lock_renewal_duration
 
 
+def get_topic_name_from_method(func):
+    function_name = func.__name__
+    if not function_name.startswith("on_"):
+        raise Exception(f"Function name must be in the form on_<entity-name>_<event-name>")
+    topic_name = case.snake_to_kebab_case(function_name[3:])
+    return topic_name
+
+
+def get_topic_name_from_event_class(event_class):
+    event_class_name = event_class.__name__
+    if not event_class_name.endswith("StateChangeEvent"):
+        raise Exception(f"Event class name must end with StateChangeEvent")
+
+    topic_name = event_class_name.replace("StateChangeEvent", "")
+
+    return case.pascal_to_kebab_case(topic_name)
+
+
 class ConsumerApp:
     """ConsumerApp is a helper for simplifying the consumption of messages from a Service Bus topic/subscription"""
 
@@ -149,40 +146,18 @@ class ConsumerApp:
     def _init_event_classes(self):
         event_classes = StateChangeEventBase.get_event_classes()
 
-        # build a map of event types to converters
-        self._payload_type_converters = {
-            # note the event_class=event_class to capture the current value of event_class on each iteration
-            event_class: lambda msg_dict, event_class=event_class: event_class.from_dict(msg_dict)
-            for event_class in event_classes
-        }
         self._topic_to_event_class_map = {
-            ConsumerApp._get_topic_name_from_event_class(event_class): event_class for event_class in event_classes
+            get_topic_name_from_event_class(event_class): event_class for event_class in event_classes
         }
 
         for event_class in event_classes:
             self._logger.info(f"🔎 Found state event class: {event_class}")
 
-    def _get_topic_name_from_method(func):
-        function_name = func.__name__
-        if not function_name.startswith("on_"):
-            raise Exception(f"Function name must be in the form on_<entity-name>_<event-name>")
-        topic_name = case.snake_to_kebab_case(function_name[3:])
-        return topic_name
-
     def _get_event_class_from_method(self, func):
-        topic_name = ConsumerApp._get_topic_name_from_method(func)
+        topic_name = get_topic_name_from_method(func)
         return self._topic_to_event_class_map[topic_name]
 
-    def _get_topic_name_from_event_class(event_class):
-        event_class_name = event_class.__name__
-        if not event_class_name.endswith("StateChangeEvent"):
-            raise Exception(f"Event class name must end with StateChangeEvent")
-
-        topic_name = event_class_name.replace("StateChangeEvent", "")
-
-        return case.pascal_to_kebab_case(topic_name)
-
-    def _get_payload_converter_from_method(self, func):
+    def _get_payload_type_from_method(self, func):
         argspec = inspect.getfullargspec(func)
 
         # For simplicity currently, limit to a single argument that is the notification payload
@@ -190,23 +165,7 @@ class ConsumerApp:
             raise Exception("Function must have exactly one argument (the notification)")
 
         event_class = argspec.annotations.get(argspec.args[0], None)
-        if event_class is None:
-            # default to dict for now
-            # TODO - use func name to determine default type
-            event_class = self._get_event_class_from_method(func)
-            self._logger.debug(f"No event payload annotation found, defaulting to {event_class.__qualname__}")
-
-        if event_class == dict:
-            # no conversion needed
-            self._logger.debug("Using no-op converter for dict payload")
-            return lambda msg_dict: msg_dict
-
-        self._logger.debug(f"Using converter for payload type: {event_class}")
-        converter = self._payload_type_converters.get(event_class, None)
-        if converter is None:
-            raise Exception(f"Unsupported payload type: {event_class}")
-
-        return converter
+        return event_class
 
     def consume(
         self,
@@ -254,7 +213,7 @@ class ConsumerApp:
         max_wait_time: Optional[int] = None,
         max_lock_renewal_duration: Optional[int] = None,
     ):
-        notification_type = ConsumerApp._get_topic_name_from_method(func)
+        notification_type = get_topic_name_from_method(func)
 
         if subscription_name is None:
             subscription_name = self._default_subscription_name
@@ -263,21 +222,26 @@ class ConsumerApp:
             topic_name = notification_type
             self._logger.debug(f"topic_name not set, using topic_name from function name: {topic_name}")
 
-        if self._topic_to_event_class_map.get(topic_name, None) is None:
+        event_class = self._topic_to_event_class_map.get(topic_name, None)
+        if event_class is None:
             raise Exception(f"No event class found to match topic name '{topic_name}'")
 
         self._logger.info(
             f"🔎 Found consumer {func.__qualname__} (topic={topic_name}, subscription={subscription_name}"
         )
 
-        payload_converter = self._get_payload_converter_from_method(func)
-
         async def wrap_handler(receiver: ServiceBusReceiver, msg: ServiceBusReceivedMessage):
-            try:
-                # Convert message to correct payload type
-                parsed_message = jsons.loads(str(msg), dict)
-                payload = payload_converter(parsed_message)
+            # Convert message to correct payload type
+            parsed_message = jsons.loads(str(msg), dict)
+            payload_type = self._get_payload_type_from_method(func)
+            if payload_type is dict:
+                payload = parsed_message
+            elif payload_type is None or payload_type is event_class:
+                payload = parse_obj_as(event_class, parsed_message)
+            else:
+                raise Exception(f"Unsupported payload type: {payload_type}")
 
+            try:
                 # Call the decorated function
                 result = await func(payload)
 

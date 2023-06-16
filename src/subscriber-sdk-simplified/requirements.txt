@@ -5,3 +5,4 @@ python-dotenv
 jsons
 pytest
 pytest-asyncio
+pydantic

@@ -8,30 +8,15 @@ from .test_helpers import MockServiceBusClientBuilder, run_app_with_timeout
 
 
 class SampleEventStateChangeEvent(StateChangeEventBase):
-    def __init__(self, entity_id: str):
-        super().__init__(entity_type="sample", new_state="event", entity_id=entity_id)
-
-    def from_dict(data: dict):
-        logging.info(f"In SampleEventStateChangeEvent.from_dict: {dict}")
-        return SampleEventStateChangeEvent(data["entity_id"])
+    pass
 
 
 class SampleEvent1StateChangeEvent(StateChangeEventBase):
-    def __init__(self, entity_id: str):
-        super().__init__(entity_type="sample", new_state="event", entity_id=entity_id)
-
-    def from_dict(data: dict):
-        logging.info(f"In SampleEvent1StateChangeEvent.from_dict: {dict}")
-        return SampleEvent1StateChangeEvent(data["entity_id"])
+    pass
 
 
 class SampleEvent2StateChangeEvent(StateChangeEventBase):
-    def __init__(self, entity_id: str):
-        super().__init__(entity_type="sample", new_state="event", entity_id=entity_id)
-
-    def from_dict(data: dict):
-        logging.info(f"In SampleEvent2StateChangeEvent.from_dict: {dict}")
-        return SampleEvent2StateChangeEvent(data["entity_id"])
+    pass
 
 
 def test_consumer_receives_single_message():
@@ -53,8 +38,58 @@ def test_consumer_receives_single_message():
 
         asyncio.run(run_app_with_timeout(app))
 
-    assert isinstance(received_message, SampleEventStateChangeEvent), "Unexpected message type"
+    assert isinstance(
+        received_message, SampleEventStateChangeEvent
+    ), f"Unexpected message type, got {type(received_message)}"
     assert received_message.entity_id == "123", "Unexpected message body"
+
+
+def test_consumer_with_no_annotation_receives_event_type():
+    messages = ['{"entity_id": "123"}']
+    mock_client_builder = MockServiceBusClientBuilder()
+    mock_sb_client = mock_client_builder.add_messages_for_topic_subscription(
+        "sample-event", "TEST_SUB", messages=messages
+    ).build()
+    with patch("azure.servicebus.aio.ServiceBusClient.from_connection_string", return_value=mock_sb_client):
+        app = ConsumerApp(default_subscription_name="TEST_SUB")
+
+        received_message = None
+
+        @app.consume(max_wait_time=0.1)
+        async def on_sample_event(message):
+            nonlocal received_message
+            logging.info("In on_sample_event")
+            received_message = message
+
+        asyncio.run(run_app_with_timeout(app))
+
+    assert isinstance(
+        received_message, SampleEventStateChangeEvent
+    ), f"Unexpected message type, got {type(received_message)}"
+    assert received_message.entity_id == "123", "Unexpected message body"
+
+
+def test_consumer_with_dict_annotation_receives_dict_type():
+    messages = ['{"entity_id": "123"}']
+    mock_client_builder = MockServiceBusClientBuilder()
+    mock_sb_client = mock_client_builder.add_messages_for_topic_subscription(
+        "sample-event", "TEST_SUB", messages=messages
+    ).build()
+    with patch("azure.servicebus.aio.ServiceBusClient.from_connection_string", return_value=mock_sb_client):
+        app = ConsumerApp(default_subscription_name="TEST_SUB")
+
+        received_message = None
+
+        @app.consume(max_wait_time=0.1)
+        async def on_sample_event(message: dict):
+            nonlocal received_message
+            logging.info("In on_sample_event")
+            received_message = message
+
+        asyncio.run(run_app_with_timeout(app))
+
+    assert isinstance(received_message, dict), f"Unexpected message type, got {type(received_message)}"
+    assert received_message["entity_id"] == "123", "Unexpected message body"
 
 
 def test_consumer_completes_message_when_no_return_value():

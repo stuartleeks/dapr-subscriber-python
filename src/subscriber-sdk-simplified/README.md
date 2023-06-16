@@ -13,15 +13,9 @@ This can be used to register a function as a subscriber to a topic:
 consumer_app = ConsumerApp()
 
 # Event model for the task-created event
-class TaskCreatedStateChangeEvent(StateChangeEventBase):
-    def __init__(self, entity_id: str):
-        super().__init__(entity_type="user", new_state="created", entity_id=entity_id)
-
-    def from_dict(msg_dict: dict):
-        return TaskCreatedStateChangeEvent(msg_dict["entity_id"])
-
-    def __repr__(self) -> str:
-        return f"TaskCreatedStateChangeEvent(entity_id={self._entity_id})"
+class TaskCreatedStateChangeEvent(BaseModel):
+    # Add any task-created event properties here
+    pass
 
 
 # Consumer function that will be registered as a subscriber to the task-created topic
