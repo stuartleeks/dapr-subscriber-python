@@ -4,9 +4,9 @@ from datetime import timedelta
 from typing import Optional
 from unittest.mock import AsyncMock, Mock
 
-from azure.servicebus.aio import ServiceBusClient, ServiceBusReceiver
+from azure.servicebus.aio import ServiceBusClient, ServiceBusReceiver, ServiceBusSender
 from azure.servicebus.amqp import AmqpAnnotatedMessage
-from azure.servicebus import ServiceBusReceivedMessage
+from azure.servicebus import ServiceBusReceivedMessage, ServiceBusMessage
 from azure.servicebus._common.utils import utc_now
 
 from .consumer_app import ConsumerApp
@@ -50,13 +50,24 @@ class MockReceivedMessage(ServiceBusReceivedMessage):
         self._locked_until_utc = value
 
 
+class SentMessage:
+    topic_name: str
+    message: ServiceBusMessage
+
+    def __init__(self, topic_name: str, message: ServiceBusMessage) -> None:
+        self.topic_name = topic_name
+        self.message = message
+
+
 class MockServiceBusClientBuilder:
     _topics: dict  # key: topic name, value: (dict keyed on subscription name, value: list of messages)
-    _topic_subscription_receivers = dict  # [str, ServiceBusReceiver]  # keyed on <topic_name>|<subscription_name>
+    _topic_subscription_receivers = dict[str, ServiceBusReceiver]  # keyed on <topic_name>|<subscription_name>
+    sentMessages: list[SentMessage]
 
     def __init__(self):
         self._topics = {}
         self._topic_subscription_receivers = {}
+        self.sentMessages = []
 
     def add_messages_for_topic_subscription(self, topic_name: str, subscription_name: str, messages: list[str]):
         topic = self._topics.get(topic_name)
@@ -108,9 +119,19 @@ class MockServiceBusClientBuilder:
 
         return receiver
 
+    def get_topic_sender(self, topic_name):
+        sender = Mock(spec=ServiceBusSender)
+
+        async def send_messages(message: ServiceBusMessage):
+            self.sentMessages.append(SentMessage(topic_name, message))
+
+        sender.send_messages = AsyncMock(side_effect=send_messages)
+        return sender
+
     def build(self):
         mock_sb_client = AsyncMock(spec=ServiceBusClient)
         mock_sb_client.get_subscription_receiver = Mock(side_effect=self.get_subscription_receiver)
+        mock_sb_client.get_topic_sender = Mock(side_effect=self.get_topic_sender)
         return mock_sb_client
 
 
