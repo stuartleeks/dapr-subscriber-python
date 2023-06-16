@@ -4,8 +4,6 @@ import asyncio
 
 from pubsub import ConsumerApp, ConsumerResult, StateChangeEventBase, models
 
-# from pubsub.models import TaskCreatedStateChangeEvent, TaskUpdatedStateChangeEvent, UserCreatedStateChangeEvent
-
 #
 # This application demonstrates how the Service Bus SDK API could be abstracted to
 # provde a simplified dev experience for subscribing to messages through
@@ -61,12 +59,9 @@ async def on_user_created(state_changed_event: models.UserCreatedStateChangeEven
 
 # # Can also specify topic_name/subscription_name explicitly via the decorator
 # @consumer_app.consume(topic_name="task-created" pubsub_name="subscriber-sdk-simplified")
-# def non_conventional_method_name(notification: CloudEvent):
+# def non_conventional_method_name(notification: models.TaskCreatedStateChangeEvent):
 #     message_id = notification.data["id"]
 #     print(f"🔔 new notification (subscriber-2): id={message_id}")
 
 
 asyncio.run(consumer_app.run())
-
-# for sc in StateChangeEventBase.get_event_classes():
-#     print(sc.__name__)
