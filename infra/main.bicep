@@ -107,6 +107,11 @@ resource roleServiceBusDataReceiver 'Microsoft.Authorization/roleDefinitions@201
   scope: subscription()
   name: roleServiceBusDataReceiverName
 }
+var roleServiceBusDataSenderName = '69a216fc-b8fb-44d8-bc22-1f3c2cd27a39'
+resource roleServiceBusDataSender 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
+  scope: subscription()
+  name: roleServiceBusDataSenderName
+}
 
 /////////////////////////////////////
 //
@@ -205,6 +210,64 @@ resource userInactiveSubscriberSdkSimplified 'Microsoft.ServiceBus/namespaces/to
 /////////////////////////////////////
 // Application identities
 //
+
+
+// publisher identity
+resource publisherIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2022-01-31-preview' = {
+  name: 'publisher'
+  location: location
+}
+resource publisherFederatedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2022-01-31-preview' = {
+  parent: publisherIdentity
+  name: 'publisher-federated-identity'
+  properties: {
+    issuer: aks.properties.oidcIssuerProfile.issuerURL
+    subject: 'system:serviceaccount:default:publisher' // TODO - parameterise? Find a single place to set this across scripts etc?
+    audiences: [ 'api://AzureADTokenExchange' ]
+  }
+}
+
+
+resource publisherServiceBusSendTaskCreated 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
+  name: guid(resourceGroup().id, taskCreatedTopic.id, publisherIdentity.id, roleServiceBusDataSender.id)
+  scope: taskCreatedTopic
+  properties: {
+    description: 'Assign ServiceBusDataSender role to publisher for task-created'
+    principalId: publisherIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: roleServiceBusDataSender.id
+  }
+}
+resource publisherServiceBusSendTaskUpdated 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
+  name: guid(resourceGroup().id, taskUpdatedTopic.id, publisherIdentity.id, roleServiceBusDataSender.id)
+  scope: taskUpdatedTopic
+  properties: {
+    description: 'Assign ServiceBusDataSender role to publisher for task-updated'
+    principalId: publisherIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: roleServiceBusDataSender.id
+  }
+}
+resource publisherServiceBusSendUserCreated 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
+  name: guid(resourceGroup().id, userCreatedTopic.id, publisherIdentity.id, roleServiceBusDataSender.id)
+  scope: userCreatedTopic
+  properties: {
+    description: 'Assign ServiceBusDataSender role to publisher for user-created'
+    principalId: publisherIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: roleServiceBusDataSender.id
+  }
+}
+resource publisherServiceBusSendUserInactive 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
+  name: guid(resourceGroup().id, userInactiveTopic.id, publisherIdentity.id, roleServiceBusDataSender.id)
+  scope: userInactiveTopic
+  properties: {
+    description: 'Assign ServiceBusDataSender role to publisher for user-inactive'
+    principalId: publisherIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: roleServiceBusDataSender.id
+  }
+}
 
 // subscriber-sdk-simplified identity
 resource subscriberSdkSimplifiedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2022-01-31-preview' = {

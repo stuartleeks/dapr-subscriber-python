@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Pod
+metadata:
+  labels:
+    app: subscriber-sdk-simplified
+    azure.workload.identity/use: "true" 
+spec:
+  serviceAccountName: publisher
+  containers:
+  - name: subscriber-sdk-simplified
+    image: $REGISTRY_NAME/subscriber-sdk-simplified:latest
+    env:
+    env:
+      - name: SERVICE_BUS_NAMESPACE
+        value: $SERVICE_BUS_NAMESPACE
+      - name: MAX_MESSAGE_COUNT
+        value: "25"
+    imagePullPolicy: Always

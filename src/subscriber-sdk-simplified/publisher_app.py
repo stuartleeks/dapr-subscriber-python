@@ -51,6 +51,7 @@ async def run_publish():
             print(f"✅ Published message with id {id}")
         except Exception as e:
             print(f"ℹ❌ Failed to publish message. Error: {e}")
+            raise
 
     end = timer()
     duration = end - start

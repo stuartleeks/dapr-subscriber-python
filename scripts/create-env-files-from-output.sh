@@ -51,6 +51,23 @@ echo "CREATED: env file for SDK subscriber-sdk-simplified"
 mkdir -p "$script_dir/../components.k8s"
 
 service_account_namespace="default"
+service_account_name="publisher"
+client_id=$subscriber_sdk_simplified_client_id
+cat <<EOF > "$script_dir/../components.k8s/serviceaccount-${service_account_name}.secret.yaml"
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    azure.workload.identity/client-id: ${client_id}
+  labels:
+    azure.workload.identity/use: "true"
+  name: ${service_account_name}
+  namespace: ${service_account_namespace}
+EOF
+echo "CREATED: k8s service account file for $service_account_name"
+
+
+service_account_namespace="default"
 service_account_name="subscriber-sdk-simplified"
 client_id=$subscriber_sdk_simplified_client_id
 cat <<EOF > "$script_dir/../components.k8s/serviceaccount-${service_account_name}.secret.yaml"

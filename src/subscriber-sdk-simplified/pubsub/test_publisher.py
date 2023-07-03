@@ -25,3 +25,8 @@ async def test_publish():
 
     assert message.topic_name == "sample-publisher", "Unexpected topic name"
     assert str(message.message) == '{"entity_id": "123"}', "Unexpected message body"
+
+    assert len(mock_client_builder.topic_senders) == 1, "Expected a single topic sender to be created"
+    topic_sender = mock_client_builder.topic_senders[0]
+    assert topic_sender.send_messages.call_count == 1, "Expected a single call to send_messages"
+    assert topic_sender.entity_name == "sample-publisher", "Unexpected topic name"

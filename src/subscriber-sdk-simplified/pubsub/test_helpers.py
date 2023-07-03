@@ -63,11 +63,13 @@ class MockServiceBusClientBuilder:
     _topics: dict  # key: topic name, value: (dict keyed on subscription name, value: list of messages)
     _topic_subscription_receivers = dict[str, ServiceBusReceiver]  # keyed on <topic_name>|<subscription_name>
     sentMessages: list[SentMessage]
+    topic_senders: list[ServiceBusSender]
 
     def __init__(self):
         self._topics = {}
         self._topic_subscription_receivers = {}
         self.sentMessages = []
+        self.topic_senders = []
 
     def add_messages_for_topic_subscription(self, topic_name: str, subscription_name: str, messages: list[str]):
         topic = self._topics.get(topic_name)
@@ -126,6 +128,8 @@ class MockServiceBusClientBuilder:
             self.sentMessages.append(SentMessage(topic_name, message))
 
         sender.send_messages = AsyncMock(side_effect=send_messages)
+        sender.entity_name = topic_name
+        self.topic_senders.append(sender)
         return sender
 
     def build(self):

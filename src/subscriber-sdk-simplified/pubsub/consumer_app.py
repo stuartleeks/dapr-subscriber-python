@@ -14,6 +14,7 @@ from pydantic import BaseModel, parse_obj_as
 from timeit import default_timer as timer
 
 from . import case
+from .servicebus_connection import get_servicebus_client
 from dotenv import load_dotenv
 
 # TODO - refactor config storage/handling
@@ -334,24 +335,7 @@ class ConsumerApp:
         if len(self._subscriptions) == 0:
             raise Exception("No consumers registered - ensure you have added @consumer decorators to your handlers")
 
-        workload_identity_credential = None
-        servicebus_client = None
-
-        self._logger.info("Connecting to service bus...")
-        if AZURE_CLIENT_ID and AZURE_TENANT_ID and AZURE_AUTHORITY_HOST and AZURE_FEDERATED_TOKEN_FILE:
-            self._logger.info("Using workload identity credentials")
-            workload_identity_credential = WorkloadIdentityCredential(
-                client_id=AZURE_CLIENT_ID,
-                tenant_id=AZURE_TENANT_ID,
-                token_file_path=AZURE_FEDERATED_TOKEN_FILE,
-            )
-            servicebus_client = ServiceBusClient(
-                fully_qualified_namespace=SERVICE_BUS_NAMESPACE,
-                credential=workload_identity_credential,
-            )
-        else:
-            self._logger.info("No workload identity credentials found, using connection string")
-            servicebus_client = ServiceBusClient.from_connection_string(conn_str=CONNECTION_STR)
+        (servicebus_client, workload_identity_credential) = get_servicebus_client(self._logger)
 
         signal.signal(signal.SIGTERM, self._sigterm_handler)
 
